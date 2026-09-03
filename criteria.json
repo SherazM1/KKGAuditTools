@@ -1,0 +1,65 @@
+[
+  {
+    "id": "eye_level_messaging",
+    "category": "Messaging",
+    "applies_when": "Product or shelf-edge area is at or near eye level in frame",
+    "check": "Is there graphical/brand messaging present at eye level, not just the product itself?",
+    "suggestion": "Add eye-level graphical messaging to reinforce brand presence at the point of highest visibility"
+  },
+  {
+    "id": "riser_additional_messaging",
+    "category": "Placement",
+    "applies_when": "Product is shelved without any raised signage or riser",
+    "check": "Is a riser present with additional brand messaging?",
+    "suggestion": "Consider adding a riser to increase messaging height and visual separation from competitors"
+  },
+  {
+    "id": "pdq_new_launch",
+    "category": "Merchandising",
+    "applies_when": "A PDQ or standalone display case is present, or a new/LTO product is visible",
+    "check": "Does the PDQ highlight a new product launch, LTO, or product line extension?",
+    "suggestion": "Use PDQ space to spotlight new launches or line extensions for attention"
+  },
+  {
+    "id": "stackable_opportunity",
+    "category": "Placement",
+    "applies_when": "Product packaging shape is stackable (boxes, cans, etc.)",
+    "check": "Is the product arranged to take advantage of its stackability?",
+    "suggestion": "Reconfigure into a stacked display to increase visual footprint and shelf presence"
+  },
+  {
+    "id": "cross_merch_pdq_opportunity",
+    "category": "Merchandising",
+    "applies_when": "A complementary-use product is shelved near, but not merchandised with, its pairing product",
+    "check": "Is there a PDQ, box display, or signage bridging the two related product categories?",
+    "suggestion": "Add a PDQ tray or shelf-edge signage pairing the two products to reinforce brand cohesion"
+  },
+  {
+    "id": "brand_cohesion_callouts",
+    "category": "Messaging",
+    "applies_when": "Shelf messaging or signage is present",
+    "check": "Does the messaging match the brand's visual identity (colors, logo, tone) and include benefit/result callouts?",
+    "suggestion": "Update messaging to align with brand identity and include clear benefit callouts"
+  },
+  {
+    "id": "digital_pdp_tie_in",
+    "category": "Digital Overlap",
+    "applies_when": "Any signage or packaging is present",
+    "check": "Is there a QR code or digital element tying the in-store display to the online product page?",
+    "suggestion": "Add a QR code linking to the product page to bridge in-store and online presence"
+  },
+  {
+    "id": "shelf_space_utilization",
+    "category": "Placement",
+    "applies_when": "Visible shelf or pegboard space adjacent to the product",
+    "check": "Is allocated shelf space fully utilized with no significant empty gaps?",
+    "suggestion": "Restock or resize facing to eliminate empty shelf space"
+  },
+  {
+    "id": "sample_header_presence",
+    "category": "Merchandising",
+    "applies_when": "A sample display or trial-size unit is present",
+    "check": "Does the sample header include brand-cohesive messaging?",
+    "suggestion": "Add branded header messaging to the sample display for cohesion"
+  }
+]
