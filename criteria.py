@@ -1,90 +1,191 @@
 """
-Core vision logic for the shelf audit tool.
- 
-IMPORTANT: This file must never import streamlit. It should be callable from
-a Streamlit button, a FastAPI route, a CLI script, or a test file identically.
-That's what makes it portable when the frontend eventually changes.
+Criteria loading and validation for the shelf audit tool.
+
+This module is intentionally provider-neutral.
+It does not import Streamlit or any AI SDK.
 """
-import base64
+
+from __future__ import annotations
+
 import json
-from dataclasses import dataclass
- 
- 
-@dataclass
-class CriterionResult:
-    id: str
-    applies: bool
-    met: bool | None
-    evidence: str
-    suggestion: str | None
- 
- 
-def build_prompt(criteria: list[dict]) -> str:
-    """Builds the instruction text sent alongside the photo."""
-    criteria_json = json.dumps(criteria, indent=2)
-    return f"""You are auditing a  aretail shelf photo taken at approximately eye level (~60 inches).
- 
-For EACH criterion below, determine:
-1. "applies" - does this criterion apply to what's visible in this photo? (true/false)
-2. "met" - if it applies, is the criterion satisfied? (true/false). If it doesn't apply, set this to null.
-3. "evidence" - a short, specific description of what you see that supports your answer.
-4. "suggestion" - if applies=true and met=false, write a concrete, actionable suggestion based on the
-   criterion's suggestion template, adapted to what's actually in the photo. Otherwise set this to null.
- 
-Be conservative: only mark "applies": true when the criterion is genuinely relevant to what's in frame.
-Do not guess at brand names or products you cannot clearly identify.
- 
-Criteria:
-{criteria_json}
- 
-Return ONLY a valid JSON array, no other text, no markdown code fences. Format:
-[
-  {{"id": "criterion_id", "applies": true, "met": false, "evidence": "...", "suggestion": "..."}}
-]"""
- 
- 
-def _encode_image(image_bytes: bytes) -> str:
-    return base64.standard_b64encode(image_bytes).decode("utf-8")
- 
- 
-def evaluate_photo(image_bytes: bytes, criteria: list[dict], media_type: str = "image/jpeg") -> list[CriterionResult]:
+from pathlib import Path
+from typing import Any
+
+
+CRITERIA_FILE = Path(__file__).resolve().parent / "criteria.json"
+
+REQUIRED_FIELDS = {
+    "id",
+    "category",
+    "applies_when",
+    "check",
+    "suggestion",
+}
+
+
+class CriteriaError(ValueError):
+    """Raised when the criteria configuration is invalid."""
+
+
+def _validate_criterion(
+    criterion: Any,
+    index: int,
+) -> dict:
+    if not isinstance(criterion, dict):
+        raise CriteriaError(
+            f"Criterion #{index + 1} must be a JSON object."
+        )
+
+    missing_fields = REQUIRED_FIELDS - criterion.keys()
+
+    if missing_fields:
+        missing = ", ".join(sorted(missing_fields))
+
+        raise CriteriaError(
+            f"Criterion #{index + 1} is missing required fields: {missing}"
+        )
+
+    cleaned = {}
+
+    for field in REQUIRED_FIELDS:
+        value = criterion[field]
+
+        if not isinstance(value, str):
+            raise CriteriaError(
+                f"Criterion #{index + 1} field '{field}' must be text."
+            )
+
+        value = value.strip()
+
+        if not value:
+            raise CriteriaError(
+                f"Criterion #{index + 1} field '{field}' cannot be empty."
+            )
+
+        cleaned[field] = value
+
+    return cleaned
+
+
+def validate_criteria(criteria: Any) -> list[dict]:
     """
-    Sends a shelf photo + criteria list to the vision model and returns
-    structured, parsed results - one per criterion.
+    Validate the complete criteria collection.
+
+    Returns a cleaned list of criteria if valid.
     """
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=2000,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": media_type,
-                            "data": _encode_image(image_bytes),
-                        },
-                    },
-                    {"type": "text", "text": build_prompt(criteria)},
-                ],
-            }
-        ],
-    )
- 
-    raw_text = response.content[0].text.strip()
- 
-    # Defensive cleanup in case the model wraps output in code fences anyway
-    if raw_text.startswith("```"):
-        raw_text = raw_text.strip("`")
-        if raw_text.startswith("json"):
-            raw_text = raw_text[4:]
-        raw_text = raw_text.strip()
- 
+
+    if not isinstance(criteria, list):
+        raise CriteriaError(
+            "criteria.json must contain a JSON array."
+        )
+
+    if not criteria:
+        raise CriteriaError(
+            "criteria.json does not contain any criteria."
+        )
+
+    validated = []
+    seen_ids = set()
+
+    for index, criterion in enumerate(criteria):
+        cleaned = _validate_criterion(
+            criterion,
+            index,
+        )
+
+        criterion_id = cleaned["id"]
+
+        if criterion_id in seen_ids:
+            raise CriteriaError(
+                f"Duplicate criterion id found: '{criterion_id}'"
+            )
+
+        seen_ids.add(criterion_id)
+        validated.append(cleaned)
+
+    return validated
+
+
+def load_criteria(
+    path: Path | str | None = None,
+) -> list[dict]:
+    """
+    Load and validate criteria from JSON.
+
+    A custom path may be supplied for tests or future alternate criteria sets.
+    """
+
+    criteria_path = Path(path) if path else CRITERIA_FILE
+
+    if not criteria_path.exists():
+        raise FileNotFoundError(
+            f"Criteria file not found: {criteria_path}"
+        )
+
+    try:
+        raw_text = criteria_path.read_text(
+            encoding="utf-8"
+        )
+
+    except OSError as exc:
+        raise CriteriaError(
+            f"Could not read criteria file: {exc}"
+        ) from exc
+
     try:
         parsed = json.loads(raw_text)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Model did not return valid JSON. Raw response:\n{raw_text}") from e
- 
-    return [CriterionResult(**item) for item in parsed]
+
+    except json.JSONDecodeError as exc:
+        raise CriteriaError(
+            "criteria.json contains invalid JSON. "
+            f"Line {exc.lineno}, column {exc.colno}: {exc.msg}"
+        ) from exc
+
+    return validate_criteria(parsed)
+
+
+def get_categories(
+    criteria: list[dict],
+) -> list[str]:
+    """
+    Return available criterion categories in alphabetical order.
+    """
+
+    categories = {
+        criterion["category"]
+        for criterion in criteria
+    }
+
+    return sorted(categories)
+
+
+def filter_criteria(
+    criteria: list[dict],
+    *,
+    category: str | None = None,
+    ids: set[str] | None = None,
+) -> list[dict]:
+    """
+    Return a subset of criteria.
+
+    This will support future audit modes without coupling
+    filtering logic to the UI.
+    """
+
+    filtered = criteria
+
+    if category:
+        filtered = [
+            criterion
+            for criterion in filtered
+            if criterion["category"] == category
+        ]
+
+    if ids:
+        filtered = [
+            criterion
+            for criterion in filtered
+            if criterion["id"] in ids
+        ]
+
+    return filtered
