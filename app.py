@@ -6,9 +6,6 @@ before adding database, history, or a criteria editor. Keep this dumb on purpose
 """
 import streamlit as st
  
-from core.vision import evaluate_photo
-from core.criteria import load_criteria
- 
 st.set_page_config(page_title="Shelf Audit Tool", page_icon="\U0001F4F8")
 st.title("Shelf Audit Tool")
 st.caption("Take a shelf photo at approximately eye level (~60 inches) to get audit suggestions.")

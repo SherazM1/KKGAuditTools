@@ -22,7 +22,7 @@ class CriterionResult:
 def build_prompt(criteria: list[dict]) -> str:
     """Builds the instruction text sent alongside the photo."""
     criteria_json = json.dumps(criteria, indent=2)
-    return f"""You are auditing a retail shelf photo taken at approximately eye level (~60 inches).
+    return f"""You are auditing a  aretail shelf photo taken at approximately eye level (~60 inches).
  
 For EACH criterion below, determine:
 1. "applies" - does this criterion apply to what's visible in this photo? (true/false)
