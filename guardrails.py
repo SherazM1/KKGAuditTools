@@ -7,6 +7,7 @@ This module stays independent of Streamlit and AI providers.
 from __future__ import annotations
 
 from models import AuditImage, AuditMode, CriterionResult
+from opportunity import Opportunity
 
 
 SUPPORTED_MEDIA_TYPES = {
@@ -117,7 +118,7 @@ def validate_result_logic(
     result: CriterionResult,
 ) -> CriterionResult:
     """
-    Validate logical relationships inside one model result.
+    Validate logical relationships inside one criterion result.
     """
 
     if not isinstance(result.applies, bool):
@@ -183,7 +184,10 @@ def validate_results(
     criteria: list[dict],
 ) -> list[CriterionResult]:
     """
-    Validate the complete result set returned by a provider.
+    Validate the complete criterion-result set returned by a provider.
+
+    This is retained for compatibility with the older checklist-style
+    result model.
     """
 
     if not isinstance(results, list):
@@ -191,7 +195,10 @@ def validate_results(
             "Audit results must be returned as a list."
         )
 
-    validate_result_ids(results, criteria)
+    validate_result_ids(
+        results,
+        criteria,
+    )
 
     seen_ids = set()
 
@@ -207,6 +214,111 @@ def validate_results(
             )
 
         seen_ids.add(result.id)
-        validate_result_logic(result)
+
+        validate_result_logic(
+            result
+        )
 
     return results
+
+
+def validate_opportunities(
+    opportunities: list[Opportunity],
+    criteria: list[dict],
+) -> list[Opportunity]:
+    """
+    Validate provider-generated opportunities before ranking.
+    """
+
+    if not isinstance(opportunities, list):
+        raise GuardrailError(
+            "Provider must return a list of opportunities."
+        )
+
+    allowed_ids = {
+        criterion["id"]
+        for criterion in criteria
+    }
+
+    seen_ids = set()
+
+    for opportunity in opportunities:
+
+        if not isinstance(opportunity, Opportunity):
+            raise GuardrailError(
+                "Provider returned an invalid opportunity object."
+            )
+
+        if opportunity.criterion_id not in allowed_ids:
+            raise GuardrailError(
+                f"Unknown criterion returned: "
+                f"'{opportunity.criterion_id}'"
+            )
+
+        if opportunity.criterion_id in seen_ids:
+            raise GuardrailError(
+                f"Duplicate opportunity returned for "
+                f"'{opportunity.criterion_id}'"
+            )
+
+        seen_ids.add(
+            opportunity.criterion_id
+        )
+
+        if not isinstance(opportunity.title, str):
+            raise GuardrailError(
+                f"Opportunity '{opportunity.criterion_id}' "
+                "title must be text."
+            )
+
+        if not opportunity.title.strip():
+            raise GuardrailError(
+                f"Opportunity '{opportunity.criterion_id}' "
+                "must include a title."
+            )
+
+        if not isinstance(opportunity.evidence, str):
+            raise GuardrailError(
+                f"Opportunity '{opportunity.criterion_id}' "
+                "evidence must be text."
+            )
+
+        if not opportunity.evidence.strip():
+            raise GuardrailError(
+                f"Opportunity '{opportunity.criterion_id}' "
+                "must include evidence."
+            )
+
+        if not isinstance(opportunity.recommendation, str):
+            raise GuardrailError(
+                f"Opportunity '{opportunity.criterion_id}' "
+                "recommendation must be text."
+            )
+
+        if not opportunity.recommendation.strip():
+            raise GuardrailError(
+                f"Opportunity '{opportunity.criterion_id}' "
+                "must include a recommendation."
+            )
+
+        for field_name, value in {
+            "relevance": opportunity.relevance,
+            "confidence": opportunity.confidence,
+            "impact": opportunity.impact,
+        }.items():
+
+            if not isinstance(value, (int, float)):
+                raise GuardrailError(
+                    f"{field_name} for "
+                    f"'{opportunity.criterion_id}' "
+                    "must be numeric."
+                )
+
+            if not 0.0 <= value <= 1.0:
+                raise GuardrailError(
+                    f"{field_name} for "
+                    f"'{opportunity.criterion_id}' "
+                    "must be between 0.0 and 1.0."
+                )
+
+    return opportunities
