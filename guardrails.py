@@ -305,6 +305,7 @@ def validate_opportunities(
             "relevance": opportunity.relevance,
             "confidence": opportunity.confidence,
             "impact": opportunity.impact,
+            "actionability": opportunity.actionability,
         }.items():
 
             if not isinstance(value, (int, float)):

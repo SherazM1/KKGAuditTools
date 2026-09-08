@@ -20,6 +20,7 @@ class Opportunity:
     relevance: float
     confidence: float
     impact: float
+    actionability: float
 
     priority_score: float = 0.0
 
@@ -28,9 +29,10 @@ def calculate_priority_score(
     relevance: float,
     confidence: float,
     impact: float,
+    actionability: float,
 ) -> float:
     """
-    Calculate a simple opportunity priority score.
+    Calculate an opportunity priority score.
 
     Values are expected between 0.0 and 1.0.
     """
@@ -39,15 +41,26 @@ def calculate_priority_score(
         "relevance": relevance,
         "confidence": confidence,
         "impact": impact,
+        "actionability": actionability,
     }
 
     for name, value in values.items():
+        if not isinstance(value, (int, float)):
+            raise ValueError(
+                f"{name} must be numeric."
+            )
+
         if not 0.0 <= value <= 1.0:
             raise ValueError(
                 f"{name} must be between 0.0 and 1.0."
             )
 
-    return relevance * confidence * impact
+    return (
+        relevance
+        * confidence
+        * impact
+        * actionability
+    )
 
 
 def rank_opportunities(
@@ -62,6 +75,7 @@ def rank_opportunities(
             relevance=opportunity.relevance,
             confidence=opportunity.confidence,
             impact=opportunity.impact,
+            actionability=opportunity.actionability,
         )
 
     return sorted(

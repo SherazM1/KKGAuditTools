@@ -9,7 +9,7 @@ This module coordinates:
 - cache lookup / storage
 - rate limiting
 - provider execution
-- opportunity ranking
+- opportunity prioritization
 - usage tracking
 
 It does not import Streamlit or any specific AI SDK.
@@ -29,7 +29,7 @@ from guardrails import (
 from infrastructure.cache import build_request_fingerprint
 from infrastructure.usage import AuditUsageRecord
 from models import AuditMode, AuditRequest, AuditResult
-from opportunity import limit_opportunities
+from prioritization import prioritize_opportunities
 
 
 def run_audit(
@@ -127,7 +127,10 @@ def run_audit(
         # Only applied on cache miss
         # -------------------------------------------------
 
-        if rate_limiter is not None and rate_limit_key is not None:
+        if (
+            rate_limiter is not None
+            and rate_limit_key is not None
+        ):
             rate_limiter.check_and_record(
                 rate_limit_key
             )
@@ -136,20 +139,36 @@ def run_audit(
         # Provider execution
         # -------------------------------------------------
 
-        opportunities = provider.analyze(request)
+        opportunities = provider.analyze(
+            request
+        )
+
+        # -------------------------------------------------
+        # Provider output guardrails
+        # -------------------------------------------------
 
         opportunities = validate_opportunities(
             opportunities,
             criteria,
         )
 
-        ranked = limit_opportunities(
+        # -------------------------------------------------
+        # Prioritization
+        #
+        # This handles:
+        # - confidence filtering
+        # - duplicate / overlap reduction
+        # - priority scoring
+        # - final Quick / Deep result limit
+        # -------------------------------------------------
+
+        prioritized = prioritize_opportunities(
             opportunities,
             max_results=mode_config.max_opportunities,
         )
 
         result = AuditResult(
-            opportunities=ranked,
+            opportunities=prioritized,
             mode=mode,
             criteria_evaluated=len(criteria),
         )
@@ -163,6 +182,10 @@ def run_audit(
                 fingerprint,
                 result,
             )
+
+        # -------------------------------------------------
+        # Usage tracking
+        # -------------------------------------------------
 
         duration = perf_counter() - start_time
 

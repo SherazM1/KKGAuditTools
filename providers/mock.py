@@ -45,6 +45,7 @@ class MockAuditProvider(AuditProvider):
             relevance: float,
             confidence: float,
             impact: float,
+            actionability: float,
         ) -> None:
             if criterion_id not in available_ids:
                 return
@@ -58,6 +59,7 @@ class MockAuditProvider(AuditProvider):
                     relevance=relevance,
                     confidence=confidence,
                     impact=impact,
+                    actionability=actionability,
                 )
             )
 
@@ -75,6 +77,7 @@ class MockAuditProvider(AuditProvider):
             relevance=0.95,
             confidence=0.90,
             impact=0.85,
+            actionability=0.92,
         )
 
         add_if_available(
@@ -91,6 +94,7 @@ class MockAuditProvider(AuditProvider):
             relevance=0.90,
             confidence=0.85,
             impact=0.80,
+            actionability=0.90,
         )
 
         add_if_available(
@@ -107,6 +111,7 @@ class MockAuditProvider(AuditProvider):
             relevance=0.78,
             confidence=0.78,
             impact=0.72,
+            actionability=0.88,
         )
 
         add_if_available(
@@ -123,6 +128,7 @@ class MockAuditProvider(AuditProvider):
             relevance=0.74,
             confidence=0.72,
             impact=0.76,
+            actionability=0.82,
         )
 
         add_if_available(
@@ -139,6 +145,7 @@ class MockAuditProvider(AuditProvider):
             relevance=0.71,
             confidence=0.70,
             impact=0.74,
+            actionability=0.85,
         )
 
         add_if_available(
@@ -155,6 +162,7 @@ class MockAuditProvider(AuditProvider):
             relevance=0.60,
             confidence=0.65,
             impact=0.58,
+            actionability=0.70,
         )
 
         add_if_available(
@@ -171,6 +179,7 @@ class MockAuditProvider(AuditProvider):
             relevance=0.58,
             confidence=0.60,
             impact=0.66,
+            actionability=0.68,
         )
 
         return opportunities
