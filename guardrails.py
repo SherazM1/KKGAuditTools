@@ -6,7 +6,7 @@ This module stays independent of Streamlit and AI providers.
 
 from __future__ import annotations
 
-from models import AuditImage, AuditMode, CriterionResult
+from models import AuditImage, AuditMode, CriterionResult, TargetRegion
 from opportunity import Opportunity
 
 
@@ -54,7 +54,7 @@ def validate_image(image: AuditImage) -> AuditImage:
 
 def validate_mode(
     mode: AuditMode,
-    focused_category: str | None = None,
+    target_region: TargetRegion | None = None,
 ) -> None:
     """
     Validate audit mode configuration.
@@ -65,16 +65,80 @@ def validate_mode(
             "Invalid audit mode."
         )
 
-    if mode is AuditMode.FOCUSED:
-        if not focused_category:
+    if mode is AuditMode.EXPANDED:
+        if target_region is None:
             raise GuardrailError(
-                "Focused audit mode requires a category."
+                "Expanded audit mode requires a target region."
             )
 
-    elif focused_category is not None:
-        raise GuardrailError(
-            "A focused category can only be used in focused audit mode."
+        validate_target_region(
+            target_region
         )
+
+    elif target_region is not None:
+        raise GuardrailError(
+            "A target region can only be used in expanded audit mode."
+        )
+
+
+def validate_target_region(
+    target_region: TargetRegion,
+) -> TargetRegion:
+    """
+    Validate one normalized target region.
+
+    Coordinates must remain within the 0.0 to 1.0 image space.
+    """
+
+    if not isinstance(target_region, TargetRegion):
+        raise GuardrailError(
+            "Target region is invalid."
+        )
+
+    values = {
+        "x": target_region.x,
+        "y": target_region.y,
+        "width": target_region.width,
+        "height": target_region.height,
+    }
+
+    for field_name, value in values.items():
+        if not isinstance(value, (int, float)):
+            raise GuardrailError(
+                f"Target region '{field_name}' must be numeric."
+            )
+
+    if not 0.0 <= target_region.x <= 1.0:
+        raise GuardrailError(
+            "Target region x must be between 0.0 and 1.0."
+        )
+
+    if not 0.0 <= target_region.y <= 1.0:
+        raise GuardrailError(
+            "Target region y must be between 0.0 and 1.0."
+        )
+
+    if not 0.0 < target_region.width <= 1.0:
+        raise GuardrailError(
+            "Target region width must be greater than 0.0 and at most 1.0."
+        )
+
+    if not 0.0 < target_region.height <= 1.0:
+        raise GuardrailError(
+            "Target region height must be greater than 0.0 and at most 1.0."
+        )
+
+    if target_region.x + target_region.width > 1.0:
+        raise GuardrailError(
+            "Target region extends beyond the right edge of the image."
+        )
+
+    if target_region.y + target_region.height > 1.0:
+        raise GuardrailError(
+            "Target region extends beyond the bottom edge of the image."
+        )
+
+    return target_region
 
 
 def validate_selected_criteria(

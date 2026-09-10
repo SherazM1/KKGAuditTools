@@ -25,7 +25,19 @@
     "category": "Placement",
     "applies_when": "Product packaging shape is stackable (boxes, cans, etc.)",
     "check": "Is the product arranged to take advantage of its stackability?",
-    "suggestion": "Reconfigure into a stacked display to increase visual footprint and shelf presence"
+    "suggestion": "Reconfigure into a stacked display to increase visual footprint and shelf presence",
+    "priority": 0.85,
+    "opportunity_type": "display_structure",
+    "visual_signals": [
+      "stackable package shape",
+      "unused vertical space",
+      "single-layer product arrangement"
+    ],
+    "fixture_types": [
+      "shelf"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false
   },
   {
     "id": "cross_merch_pdq_opportunity",

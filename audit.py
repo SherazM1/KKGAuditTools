@@ -3,6 +3,7 @@ Audit orchestration.
 
 This module coordinates:
 - mode configuration
+- depth configuration
 - criteria selection
 - guardrails
 - request fingerprinting
@@ -19,7 +20,7 @@ from __future__ import annotations
 
 from time import perf_counter
 
-from audit_modes import get_mode_config
+from audit_modes import get_mode_config, get_depth_config
 from guardrails import (
     validate_image,
     validate_mode,
@@ -28,7 +29,13 @@ from guardrails import (
 )
 from infrastructure.cache import build_request_fingerprint
 from infrastructure.usage import AuditUsageRecord
-from models import AuditMode, AuditRequest, AuditResult
+from models import (
+    AuditMode,
+    AuditDepth,
+    TargetRegion,
+    AuditRequest,
+    AuditResult,
+)
 from prioritization import prioritize_opportunities
 
 
@@ -37,8 +44,9 @@ def run_audit(
     image,
     criteria: list[dict],
     mode: AuditMode,
+    depth: AuditDepth,
     provider,
-    focused_category: str | None = None,
+    target_region: TargetRegion | None = None,
     cache=None,
     rate_limiter=None,
     rate_limit_key: str | None = None,
@@ -72,24 +80,28 @@ def run_audit(
 
         validate_mode(
             mode,
-            focused_category=focused_category,
+            target_region=target_region,
         )
 
         validate_selected_criteria(criteria)
 
         mode_config = get_mode_config(mode)
+        depth_config = get_depth_config(depth)
 
         request = AuditRequest(
             image=image,
             criteria=criteria,
             mode=mode,
-            focused_category=focused_category,
+            depth=depth,
+            target_region=target_region,
         )
 
         fingerprint = build_request_fingerprint(
             image=image,
             mode=mode,
             criteria=criteria,
+            depth=depth,
+            target_region=target_region,
             provider_name=provider_name,
             model_name=model_name,
         )
@@ -108,6 +120,7 @@ def run_audit(
                     usage_tracker.record(
                         AuditUsageRecord(
                             mode=mode.value,
+                            depth=depth.value,
                             provider_name=provider_name,
                             model_name=model_name,
                             cache_hit=True,
@@ -164,12 +177,14 @@ def run_audit(
 
         prioritized = prioritize_opportunities(
             opportunities,
-            max_results=mode_config.max_opportunities,
+            max_results=depth_config.max_opportunities,
+            min_confidence=depth_config.min_confidence,
         )
 
         result = AuditResult(
             opportunities=prioritized,
             mode=mode,
+            depth=depth,
             criteria_evaluated=len(criteria),
         )
 
@@ -193,6 +208,7 @@ def run_audit(
             usage_tracker.record(
                 AuditUsageRecord(
                     mode=mode.value,
+                    depth=depth.value,
                     provider_name=provider_name,
                     model_name=model_name,
                     cache_hit=False,
@@ -214,6 +230,7 @@ def run_audit(
             usage_tracker.record(
                 AuditUsageRecord(
                     mode=mode.value,
+                    depth=depth.value,
                     provider_name=provider_name,
                     model_name=model_name,
                     cache_hit=False,

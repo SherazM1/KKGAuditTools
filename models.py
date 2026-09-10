@@ -13,9 +13,37 @@ from enum import Enum
 
 
 class AuditMode(str, Enum):
+    """
+    What kind of audit is being performed.
+    """
+
+    PRODUCT = "product"
+    EXPANDED = "expanded"
+
+
+class AuditDepth(str, Enum):
+    """
+    How deeply the audit should analyze the scene.
+    """
+
     QUICK = "quick"
-    FULL = "full"
-    FOCUSED = "focused"
+    DEEP = "deep"
+
+
+@dataclass
+class TargetRegion:
+    """
+    Normalized target region used by Expanded mode.
+
+    Coordinates are stored from 0.0 to 1.0 so the same
+    selection works regardless of displayed or processed
+    image resolution.
+    """
+
+    x: float
+    y: float
+    width: float
+    height: float
 
 
 @dataclass
@@ -33,7 +61,10 @@ class AuditImage:
 @dataclass
 class CriterionResult:
     """
-    Result returned for one audit criterion.
+    Legacy checklist-style result.
+
+    Kept for compatibility with existing guardrails while
+    the app transitions fully to opportunity-first results.
     """
 
     id: str
@@ -51,8 +82,11 @@ class AuditRequest:
 
     image: AuditImage
     criteria: list[dict]
+
     mode: AuditMode
-    focused_category: str | None = None
+    depth: AuditDepth
+
+    target_region: TargetRegion | None = None
 
 
 @dataclass
@@ -63,6 +97,7 @@ class AuditResult:
 
     opportunities: list
     mode: AuditMode
+    depth: AuditDepth
     criteria_evaluated: int
 
     @property

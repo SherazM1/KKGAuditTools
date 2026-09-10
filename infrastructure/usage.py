@@ -18,6 +18,7 @@ class AuditUsageRecord:
     """
 
     mode: str
+    depth: str
     provider_name: str
 
     cache_hit: bool

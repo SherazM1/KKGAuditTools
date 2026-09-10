@@ -11,7 +11,7 @@ import json
 from typing import Any
 
 from image_utils import hash_image
-from models import AuditImage, AuditMode
+from models import AuditImage, AuditMode, AuditDepth, TargetRegion
 from prompts import PROMPT_VERSION
 
 
@@ -34,9 +34,11 @@ def build_request_fingerprint(
     *,
     image: AuditImage,
     mode: AuditMode,
+    depth: AuditDepth,
     criteria: list[dict],
     provider_name: str,
     model_name: str | None = None,
+    target_region: TargetRegion | None = None,
 ) -> str:
     """
     Build a stable fingerprint for one audit request.
@@ -49,6 +51,16 @@ def build_request_fingerprint(
         for criterion in criteria
     ]
 
+    target_payload = None
+
+    if target_region is not None:
+        target_payload = {
+            "x": target_region.x,
+            "y": target_region.y,
+            "width": target_region.width,
+            "height": target_region.height,
+        }
+
     payload = {
         "image_hash": hash_image(image),
         "mode": mode.value,
@@ -57,6 +69,8 @@ def build_request_fingerprint(
         "prompt_version": PROMPT_VERSION,
         "provider": provider_name,
         "model": model_name,
+        "depth": depth.value,
+        "target_region": target_payload
     }
 
     serialized = _stable_json(payload)

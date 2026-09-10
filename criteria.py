@@ -22,6 +22,15 @@ REQUIRED_FIELDS = {
     "suggestion",
 }
 
+OPTIONAL_FIELDS = {
+    "priority",
+    "opportunity_type",
+    "visual_signals",
+    "fixture_types",
+    "comparison_allowed",
+    "brand_context_required",
+}
+
 
 class CriteriaError(ValueError):
     """Raised when the criteria configuration is invalid."""
@@ -45,7 +54,21 @@ def _validate_criterion(
             f"Criterion #{index + 1} is missing required fields: {missing}"
         )
 
+    allowed_fields = REQUIRED_FIELDS | OPTIONAL_FIELDS
+    unknown_fields = set(criterion.keys()) - allowed_fields
+
+    if unknown_fields:
+        unknown = ", ".join(sorted(unknown_fields))
+
+        raise CriteriaError(
+            f"Criterion #{index + 1} contains unknown fields: {unknown}"
+        )
+
     cleaned = {}
+
+    # -------------------------------------------------
+    # Required text fields
+    # -------------------------------------------------
 
     for field in REQUIRED_FIELDS:
         value = criterion[field]
@@ -63,6 +86,106 @@ def _validate_criterion(
             )
 
         cleaned[field] = value
+
+    # -------------------------------------------------
+    # Optional text fields
+    # -------------------------------------------------
+
+    for field in {
+        "opportunity_type",
+    }:
+        if field in criterion:
+            value = criterion[field]
+
+            if not isinstance(value, str):
+                raise CriteriaError(
+                    f"Criterion #{index + 1} field '{field}' must be text."
+                )
+
+            value = value.strip()
+
+            if not value:
+                raise CriteriaError(
+                    f"Criterion #{index + 1} field '{field}' cannot be empty."
+                )
+
+            cleaned[field] = value
+
+    # -------------------------------------------------
+    # Optional list fields
+    # -------------------------------------------------
+
+    for field in {
+        "visual_signals",
+        "fixture_types",
+    }:
+        if field in criterion:
+            value = criterion[field]
+
+            if not isinstance(value, list):
+                raise CriteriaError(
+                    f"Criterion #{index + 1} field '{field}' must be a list."
+                )
+
+            cleaned_values = []
+
+            for item in value:
+                if not isinstance(item, str):
+                    raise CriteriaError(
+                        f"Criterion #{index + 1} field '{field}' "
+                        "must contain only text values."
+                    )
+
+                item = item.strip()
+
+                if not item:
+                    raise CriteriaError(
+                        f"Criterion #{index + 1} field '{field}' "
+                        "cannot contain empty values."
+                    )
+
+                cleaned_values.append(item)
+
+            cleaned[field] = cleaned_values
+
+    # -------------------------------------------------
+    # Optional boolean fields
+    # -------------------------------------------------
+
+    for field in {
+        "comparison_allowed",
+        "brand_context_required",
+    }:
+        if field in criterion:
+            value = criterion[field]
+
+            if not isinstance(value, bool):
+                raise CriteriaError(
+                    f"Criterion #{index + 1} field '{field}' "
+                    "must be true or false."
+                )
+
+            cleaned[field] = value
+
+    # -------------------------------------------------
+    # Optional priority field
+    # -------------------------------------------------
+
+    if "priority" in criterion:
+        value = criterion["priority"]
+
+        if not isinstance(value, (int, float)):
+            raise CriteriaError(
+                f"Criterion #{index + 1} field 'priority' must be numeric."
+            )
+
+        if not 0.0 <= value <= 1.0:
+            raise CriteriaError(
+                f"Criterion #{index + 1} field 'priority' "
+                "must be between 0.0 and 1.0."
+            )
+
+        cleaned["priority"] = float(value)
 
     return cleaned
 
