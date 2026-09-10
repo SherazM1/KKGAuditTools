@@ -3,7 +3,7 @@ Shelf Audit Tool
 
 Current foundation:
 - camera or image upload
-- quick / deep audit modes
+- quick / deep audit depth
 - provider-neutral audit pipeline
 - ranked opportunities
 - mock provider for development
@@ -14,11 +14,11 @@ Real AI provider will be connected later.
 import streamlit as st
 
 from audit import run_audit
-from audit_modes import get_mode_config
+from audit_modes import get_depth_config
 from criteria import load_criteria
 from guardrails import GuardrailError
 from image_utils import build_audit_image
-from models import AuditMode
+from models import AuditMode, AuditDepth
 from providers.mock import MockAuditProvider
 
 
@@ -55,12 +55,12 @@ except Exception as exc:
 
 
 # ---------------------------------------------------------
-# Audit mode
+# Audit depth
 # ---------------------------------------------------------
 
 st.subheader("Audit depth")
 
-mode_label = st.radio(
+depth_label = st.radio(
     "Choose how deep you want the audit to go:",
     options=[
         "Quick Audit",
@@ -69,15 +69,26 @@ mode_label = st.radio(
     horizontal=True,
 )
 
-if mode_label == "Quick Audit":
-    audit_mode = AuditMode.QUICK
+if depth_label == "Quick Audit":
+    audit_depth = AuditDepth.QUICK
 else:
-    audit_mode = AuditMode.FULL
+    audit_depth = AuditDepth.DEEP
+
+depth_config = get_depth_config(audit_depth)
 
 
-mode_config = get_mode_config(audit_mode)
+# ---------------------------------------------------------
+# Audit mode
+#
+# Product is the default mode for now.
+# Expanded mode will be exposed once target-region
+# selection is added to the UI.
+# ---------------------------------------------------------
 
-st.caption(mode_config.description)
+audit_mode = AuditMode.PRODUCT
+
+
+st.caption(depth_config.description)
 
 
 # ---------------------------------------------------------
@@ -172,6 +183,7 @@ if image_file is not None:
                     image=audit_image,
                     criteria=criteria,
                     mode=audit_mode,
+                    depth=audit_depth,
                     provider=provider,
                 )
 
@@ -238,5 +250,5 @@ if image_file is not None:
 
         st.caption(
             f"{result.criteria_evaluated} criteria available · "
-            f"{mode_config.label}"
+            f"{depth_config.label}"
         )
