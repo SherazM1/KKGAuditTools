@@ -96,7 +96,7 @@ def _extract_single_rectangle(
     rectangles = [
         obj
         for obj in objects
-        if obj.get("type") == "rect"
+        if str(obj.get("type", "")).lower() == "rect"
     ]
 
     if len(rectangles) != 1:
@@ -384,6 +384,9 @@ if image_file is not None:
             key="expanded_target_canvas",
         )
 
+        if canvas_result.json_data is not None:
+            st.write(canvas_result.json_data)
+
         rectangle = _extract_single_rectangle(
             canvas_result
         )
@@ -400,7 +403,7 @@ if image_file is not None:
             [
                 obj
                 for obj in canvas_objects
-                if obj.get("type") == "rect"
+                if str(obj.get("type", "")).lower() == "rect"
             ]
         )
 
