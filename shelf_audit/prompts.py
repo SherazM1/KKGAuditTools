@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import json
 
-from audit_modes import get_mode_config, get_depth_config
-from models import AuditMode, AuditDepth, TargetRegion
+from .audit_modes import get_mode_config, get_depth_config
+from .models import AuditMode, AuditDepth, TargetRegion
 
 
 PROMPT_VERSION = "v2"

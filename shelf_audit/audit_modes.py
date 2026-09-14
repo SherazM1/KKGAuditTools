@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from models import AuditMode, AuditDepth
+from .models import AuditMode, AuditDepth
 
 
 @dataclass(frozen=True)

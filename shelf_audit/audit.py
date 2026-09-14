@@ -20,23 +20,23 @@ from __future__ import annotations
 
 from time import perf_counter
 
-from audit_modes import get_mode_config, get_depth_config
-from guardrails import (
+from .audit_modes import get_mode_config, get_depth_config
+from .guardrails import (
     validate_image,
     validate_mode,
     validate_selected_criteria,
     validate_opportunities,
 )
-from infrastructure.cache import build_request_fingerprint
-from infrastructure.usage import AuditUsageRecord
-from models import (
+from .infrastructure.cache import build_request_fingerprint
+from .infrastructure.usage import AuditUsageRecord
+from .models import (
     AuditMode,
     AuditDepth,
     TargetRegion,
     AuditRequest,
     AuditResult,
 )
-from prioritization import prioritize_opportunities
+from .prioritization import prioritize_opportunities
 
 
 def run_audit(
@@ -177,6 +177,7 @@ def run_audit(
 
         prioritized = prioritize_opportunities(
             opportunities,
+            criteria=criteria,
             max_results=depth_config.max_opportunities,
             min_confidence=depth_config.min_confidence,
         )

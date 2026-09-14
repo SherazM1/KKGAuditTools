@@ -10,9 +10,9 @@ import hashlib
 import json
 from typing import Any
 
-from image_utils import hash_image
-from models import AuditImage, AuditMode, AuditDepth, TargetRegion
-from prompts import PROMPT_VERSION
+from ..image_utils import hash_image
+from ..models import AuditImage, AuditMode, AuditDepth, TargetRegion
+from ..prompts import PROMPT_VERSION
 
 
 CRITERIA_VERSION = "v1"

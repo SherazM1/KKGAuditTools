@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from difflib import SequenceMatcher
 
-from opportunity import Opportunity, rank_opportunities
+from .opportunity import Opportunity, rank_opportunities
 
 
 DEFAULT_MIN_CONFIDENCE = 0.55
@@ -165,9 +165,123 @@ def deduplicate_opportunities(
     return selected
 
 
+def _build_opportunity_type_lookup(
+    criteria: list[dict],
+) -> dict[str, str]:
+    """
+    Map criterion IDs to their configured opportunity type.
+
+    Criteria without an opportunity_type are treated as their
+    own unique type so older criteria remain compatible.
+    """
+
+    lookup = {}
+
+    for criterion in criteria:
+        criterion_id = criterion["id"]
+
+        opportunity_type = criterion.get(
+            "opportunity_type"
+        )
+
+        if opportunity_type:
+            lookup[criterion_id] = opportunity_type
+        else:
+            lookup[criterion_id] = (
+                f"criterion:{criterion_id}"
+            )
+
+    return lookup
+
+
+def diversify_opportunities(
+    opportunities: list[Opportunity],
+    *,
+    criteria: list[dict],
+    max_results: int,
+) -> list[Opportunity]:
+    """
+    Prefer a diverse mix of opportunity types.
+
+    First pass:
+    take the strongest opportunity from each type.
+
+    Second pass:
+    fill any remaining result slots with the strongest
+    leftover opportunities regardless of type.
+    """
+
+    if max_results < 1:
+        raise ValueError(
+            "max_results must be at least 1."
+        )
+
+    ranked = rank_opportunities(
+        opportunities
+    )
+
+    type_lookup = _build_opportunity_type_lookup(
+        criteria
+    )
+
+    selected: list[Opportunity] = []
+    selected_ids: set[int] = set()
+    seen_types: set[str] = set()
+
+    # -------------------------------------------------
+    # First pass:
+    # strongest opportunity from each type
+    # -------------------------------------------------
+
+    for opportunity in ranked:
+
+        opportunity_type = type_lookup.get(
+            opportunity.criterion_id,
+            f"criterion:{opportunity.criterion_id}",
+        )
+
+        if opportunity_type in seen_types:
+            continue
+
+        selected.append(
+            opportunity
+        )
+
+        selected_ids.add(
+            id(opportunity)
+        )
+
+        seen_types.add(
+            opportunity_type
+        )
+
+        if len(selected) >= max_results:
+            return selected
+
+    # -------------------------------------------------
+    # Second pass:
+    # fill remaining slots with strongest leftovers
+    # -------------------------------------------------
+
+    for opportunity in ranked:
+
+        if id(opportunity) in selected_ids:
+            continue
+
+        selected.append(
+            opportunity
+        )
+
+        if len(selected) >= max_results:
+            break
+
+    return selected
+
+
 def prioritize_opportunities(
     opportunities: list[Opportunity],
     *,
+    criteria: list[dict],
     max_results: int,
     min_confidence: float = DEFAULT_MIN_CONFIDENCE,
     similarity_threshold: float = DEFAULT_SIMILARITY_THRESHOLD,
@@ -179,7 +293,8 @@ def prioritize_opportunities(
     1. confidence filter
     2. ranking
     3. duplicate / overlap reduction
-    4. final top-N limit
+    4. diversity-friendly selection
+    5. final top-N limit
     """
 
     if max_results < 1:
@@ -201,4 +316,8 @@ def prioritize_opportunities(
         deduplicated
     )
 
-    return ranked[:max_results]
+    return diversify_opportunities(
+        ranked,
+        criteria=criteria,
+        max_results=max_results,
+    )

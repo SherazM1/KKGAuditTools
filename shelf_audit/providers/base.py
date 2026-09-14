@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from models import AuditRequest
-from opportunity import Opportunity
+from ..models import AuditRequest
+from ..opportunity import Opportunity
 
 
 class AuditProvider(ABC):

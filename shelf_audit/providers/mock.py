@@ -10,9 +10,9 @@ that resemble the structure expected from a future AI provider.
 
 from __future__ import annotations
 
-from models import AuditRequest
-from opportunity import Opportunity
-from providers.base import AuditProvider
+from ..models import AuditRequest
+from ..opportunity import Opportunity
+from .base import AuditProvider
 
 
 class MockAuditProvider(AuditProvider):

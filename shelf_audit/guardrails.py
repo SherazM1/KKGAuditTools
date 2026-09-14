@@ -6,8 +6,8 @@ This module stays independent of Streamlit and AI providers.
 
 from __future__ import annotations
 
-from models import AuditImage, AuditMode, CriterionResult, TargetRegion
-from opportunity import Opportunity
+from .models import AuditImage, AuditMode, CriterionResult, TargetRegion
+from .opportunity import Opportunity
 
 
 SUPPORTED_MEDIA_TYPES = {

@@ -13,7 +13,7 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
-from models import AuditImage, TargetRegion
+from .models import AuditImage, TargetRegion
 
 
 ALLOWED_EXTENSIONS = {
