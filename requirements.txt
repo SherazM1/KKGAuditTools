@@ -1,3 +1,14 @@
 streamlit>=1.53
 pillow==11.3.0
 streamlit-drawable-canvas==0.13.0
+
+# Display Compliance classical region detection.
+opencv-python-headless>=4.10.0
+numpy>=1.24
+
+# Experimental learned backend; imports and model initialization remain lazy.
+# Checkpoints are downloaded only when learned detection is explicitly used.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.5.1,<3
+torchvision>=0.20.1,<1
+SAM-2 @ git+https://github.com/facebookresearch/sam2.git
