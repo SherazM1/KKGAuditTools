@@ -25,9 +25,13 @@ from .image_utils import (
     normalize_target_region,
     crop_target_region,
     get_image_dimensions,
+    preprocess_audit_image,
 )
 from .models import AuditMode, AuditDepth
 from .providers.mock import MockAuditProvider
+from .infrastructure.cache import MemoryAuditCache
+from .infrastructure.rate_limit import MemoryRateLimiter, RateLimitError
+from .infrastructure.usage import MemoryUsageTracker
 
 
 # ---------------------------------------------------------
@@ -167,6 +171,21 @@ def _rectangle_coordinates(
 def render():
     """Render the Shelf Audit workflow within the parent hub."""
     st.title("Shelf Audit Tool")
+
+    if "shelf_audit_cache" not in st.session_state:
+        st.session_state["shelf_audit_cache"] = MemoryAuditCache()
+
+    if "shelf_audit_rate_limiter" not in st.session_state:
+        st.session_state["shelf_audit_rate_limiter"] = MemoryRateLimiter(
+            max_requests=5,
+            window_seconds=60,
+        )
+
+    if "shelf_audit_usage_tracker" not in st.session_state:
+        st.session_state["shelf_audit_usage_tracker"] = MemoryUsageTracker(
+            max_records = 500,
+        )
+
 
     st.caption(
         "Take a shelf photo or upload an existing image to identify "
@@ -316,6 +335,10 @@ def render():
                 source=image_source,
             )
 
+            audit_image = preprocess_audit_image(
+                audit_image
+            )
+
         except Exception as exc:
             st.error(
                 f"The image could not be prepared: {exc}"
@@ -333,7 +356,7 @@ def render():
         if audit_mode is AuditMode.PRODUCT:
 
             st.image(
-                image_bytes,
+                audit_image.data,
                 caption="Selected shelf image",
                 use_container_width=True,
             )
@@ -377,7 +400,7 @@ def render():
                 fill_color="rgba(255, 0, 0, 0.15)",
                 stroke_width=3,
                 stroke_color="#ff4b4b",
-                background_image=image_bytes,
+                background_image=audit_image.data,
                 update_streamlit=True,
                 height=canvas_height,
                 width=canvas_width,
@@ -490,6 +513,7 @@ def render():
         expanded_target_ready = (
             audit_mode is AuditMode.EXPANDED
             and target_region is not None
+            and target_crop is not None
         )
 
         analyze_disabled = (
@@ -522,13 +546,26 @@ def render():
                         mode=audit_mode,
                         depth=audit_depth,
                         target_region=target_region,
+                        target_crop=target_crop,
                         provider=provider,
+                        cache=st.session_state["shelf_audit_cache"],
+                        rate_limiter=st.session_state["shelf_audit_rate_limiter"],
+                        rate_limit_key="shelf_audit",
+                        usage_tracker=st.session_state["shelf_audit_usage_tracker"]
                     )
 
             except GuardrailError as exc:
 
                 st.error(
                     f"Image or audit validation failed: {exc}"
+                )
+
+                st.stop()
+
+            except RateLimitError as exc:
+
+                st.warning(
+                    str(exc)
                 )
 
                 st.stop()

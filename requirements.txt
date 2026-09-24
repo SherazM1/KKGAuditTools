@@ -1,6 +1,7 @@
 streamlit>=1.53
 pillow==11.3.0
 streamlit-drawable-canvas==0.13.0
+openai
 
 # Display Compliance classical region detection.
 opencv-python-headless>=4.10.0

@@ -11,7 +11,7 @@ It stays independent of Streamlit and AI providers.
 """
 
 from __future__ import annotations
-
+import math
 import re
 from difflib import SequenceMatcher
 
@@ -101,9 +101,14 @@ def filter_by_confidence(
     Remove opportunities whose confidence is below the configured threshold.
     """
 
-    if not 0.0 <= min_confidence <= 1.0:
+    if (
+        isinstance(min_confidence, bool)
+        or not isinstance(min_confidence, (int, float))
+        or not math.isfinite(min_confidence)
+        or not 0.0 <= min_confidence <= 1.0
+    ):
         raise ValueError(
-            "min_confidence must be between 0.0 and 1.0."
+            "min_confidence must be a finite number between 0.0 and 1.0"
         )
 
     return [
@@ -124,10 +129,17 @@ def deduplicate_opportunities(
     The strongest-ranked opportunity is kept when two findings overlap.
     """
 
-    if not 0.0 <= similarity_threshold <= 1.0:
+    if (
+        isinstance(similarity_threshold, bool)
+        or not isinstance(similarity_threshold, (int, float))
+        or not math.isfinite(similarity_threshold)
+        or not 0.0 <= similarity_threshold <= 1.0
+    ):
         raise ValueError(
-            "similarity_threshold must be between 0.0 and 1.0."
+            "similarity_threshold must be a finite number between 0.0 and 1.0"
         )
+
+
 
     ranked = rank_opportunities(
         opportunities
@@ -225,7 +237,7 @@ def diversify_opportunities(
     )
 
     selected: list[Opportunity] = []
-    selected_ids: set[int] = set()
+    selected_criterion_ids: set[str] = set()
     seen_types: set[str] = set()
 
     # -------------------------------------------------
@@ -247,8 +259,8 @@ def diversify_opportunities(
             opportunity
         )
 
-        selected_ids.add(
-            id(opportunity)
+        selected_criterion_ids.add(
+            opportunity.criterion_id
         )
 
         seen_types.add(
@@ -256,7 +268,9 @@ def diversify_opportunities(
         )
 
         if len(selected) >= max_results:
-            return selected
+            return rank_opportunities(
+                selected
+            )
 
     # -------------------------------------------------
     # Second pass:
@@ -265,7 +279,7 @@ def diversify_opportunities(
 
     for opportunity in ranked:
 
-        if id(opportunity) in selected_ids:
+        if opportunity.criterion_id in selected_criterion_ids:
             continue
 
         selected.append(
@@ -275,7 +289,9 @@ def diversify_opportunities(
         if len(selected) >= max_results:
             break
 
-    return selected
+    return rank_opportunities(
+        selected
+    )
 
 
 def prioritize_opportunities(

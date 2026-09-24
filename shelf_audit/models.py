@@ -7,7 +7,7 @@ and future AI providers.
 """
 
 from __future__ import annotations
-
+from .opportunity import Opportunity
 from dataclasses import dataclass
 from enum import Enum
 
@@ -81,11 +81,12 @@ class AuditRequest:
     """
 
     image: AuditImage
-    criteria: list[dict]
+    criteria: tuple[dict, ...]
 
     mode: AuditMode
     depth: AuditDepth
 
+    target_crop: AuditImage | None = None
     target_region: TargetRegion | None = None
 
 
@@ -95,11 +96,13 @@ class AuditResult:
     Complete result returned by an audit run.
     """
 
-    opportunities: list
+    opportunities: list[Opportunity]
     mode: AuditMode
     depth: AuditDepth
     criteria_evaluated: int
 
     @property
-    def top_opportunities(self) -> list:
-        return self.opportunities
+    def top_opportunities(self,) -> list[Opportunity]:
+        return list(
+            self.opportunities
+        )

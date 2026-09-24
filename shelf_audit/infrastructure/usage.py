@@ -44,12 +44,23 @@ class AuditUsageRecord:
 
 class MemoryUsageTracker:
     """
-    Simple in-memory usage tracker for development.
+    Simple bounded in-memory usage tracker for development.
 
     Later this can be replaced with a database or analytics backend.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        max_records: int = 500,
+    ) -> None:
+
+        if max_records < 1:
+            raise ValueError(
+                "max_records must be at least 1."
+            )
+
+        self.max_records = max_records
         self._records: list[AuditUsageRecord] = []
 
     def record(
@@ -57,6 +68,14 @@ class MemoryUsageTracker:
         usage: AuditUsageRecord,
     ) -> None:
         self._records.append(usage)
+
+        overflow = (
+            len(self._records)
+            - self.max_records
+        )
+
+        if overflow > 0:
+            del self._records[:overflow]
 
     def all(
         self,

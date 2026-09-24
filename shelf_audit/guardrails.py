@@ -5,7 +5,7 @@ This module stays independent of Streamlit and AI providers.
 """
 
 from __future__ import annotations
-
+import math
 from .models import AuditImage, AuditMode, CriterionResult, TargetRegion
 from .opportunity import Opportunity
 
@@ -16,6 +16,10 @@ SUPPORTED_MEDIA_TYPES = {
 }
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
+MAX_OPPORTUNITY_TITLE_LENGTH = 160
+MAX_OPPORTUNITY_RECOMMENDATION_LENGTH = 400
+MAX_OPPORTUNITY_EVIDENCE_LENGTH = 1200
+MAX_PROVIDER_OPPORTUNITIES = 20
 
 
 class GuardrailError(ValueError):
@@ -103,9 +107,13 @@ def validate_target_region(
     }
 
     for field_name, value in values.items():
-        if not isinstance(value, (int, float)):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+        ):
             raise GuardrailError(
-                f"Target region '{field_name}' must be numeric."
+                f"Target region '{field_name}' " "must be a finite number."
             )
 
     if not 0.0 <= target_region.x <= 1.0:
@@ -299,6 +307,11 @@ def validate_opportunities(
             "Provider must return a list of opportunities."
         )
 
+    if len(opportunities) > MAX_PROVIDER_OPPORTUNITIES:
+        raise GuardrailError(
+            "Provider returned too many opportunities."
+        )
+
     allowed_ids = {
         criterion["id"]
         for criterion in criteria
@@ -313,57 +326,75 @@ def validate_opportunities(
                 "Provider returned an invalid opportunity object."
             )
 
-        if opportunity.criterion_id not in allowed_ids:
+        criterion_id = opportunity.criterion_id
+
+        if not isinstance(criterion_id, str):
             raise GuardrailError(
-                f"Unknown criterion returned: "
-                f"'{opportunity.criterion_id}'"
+                "Opportunity criterion_id must be text."
             )
 
-        if opportunity.criterion_id in seen_ids:
+        criterion_id = criterion_id.strip()
+
+        if not criterion_id:
+            raise GuardrailError(
+                "Opportunity criterion_id cannot be empty."
+            )
+
+        if criterion_id not in allowed_ids:
+            raise GuardrailError(
+                f"Unknown criterion returned: "
+                f"'{criterion_id}'"
+            )
+
+        if criterion_id in seen_ids:
             raise GuardrailError(
                 f"Duplicate opportunity returned for "
-                f"'{opportunity.criterion_id}'"
+                f"'{criterion_id}'"
             )
 
         seen_ids.add(
-            opportunity.criterion_id
+            criterion_id
         )
 
-        if not isinstance(opportunity.title, str):
-            raise GuardrailError(
-                f"Opportunity '{opportunity.criterion_id}' "
-                "title must be text."
-            )
+        text_fields = {
+            "title": (
+                opportunity.title,
+                MAX_OPPORTUNITY_TITLE_LENGTH,
+            ),
+            "evidence": (
+                opportunity.evidence,
+                MAX_OPPORTUNITY_EVIDENCE_LENGTH,
+            ),
+            "recommendation": (
+                opportunity.recommendation,
+                MAX_OPPORTUNITY_RECOMMENDATION_LENGTH,
+            ),
+        }
 
-        if not opportunity.title.strip():
-            raise GuardrailError(
-                f"Opportunity '{opportunity.criterion_id}' "
-                "must include a title."
-            )
+        for field_name, (
+            value,
+            max_length,
+        ) in text_fields.items():
 
-        if not isinstance(opportunity.evidence, str):
-            raise GuardrailError(
-                f"Opportunity '{opportunity.criterion_id}' "
-                "evidence must be text."
-            )
+            if not isinstance(value, str):
+                raise GuardrailError(
+                    f"Opportunity '{criterion_id}' "
+                    f"{field_name} must be text."
+                )
 
-        if not opportunity.evidence.strip():
-            raise GuardrailError(
-                f"Opportunity '{opportunity.criterion_id}' "
-                "must include evidence."
-            )
+            cleaned = value.strip()
 
-        if not isinstance(opportunity.recommendation, str):
-            raise GuardrailError(
-                f"Opportunity '{opportunity.criterion_id}' "
-                "recommendation must be text."
-            )
+            if not cleaned:
+                raise GuardrailError(
+                    f"Opportunity '{criterion_id}' "
+                    f"must include {field_name}."
+                )
 
-        if not opportunity.recommendation.strip():
-            raise GuardrailError(
-                f"Opportunity '{opportunity.criterion_id}' "
-                "must include a recommendation."
-            )
+            if len(cleaned) > max_length:
+                raise GuardrailError(
+                    f"Opportunity '{criterion_id}' "
+                    f"{field_name} is too long."
+                )
 
         for field_name, value in {
             "relevance": opportunity.relevance,
@@ -372,17 +403,21 @@ def validate_opportunities(
             "actionability": opportunity.actionability,
         }.items():
 
-            if not isinstance(value, (int, float)):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+            ):
                 raise GuardrailError(
                     f"{field_name} for "
-                    f"'{opportunity.criterion_id}' "
-                    "must be numeric."
+                    f"'{criterion_id}' "
+                    "must be a finite number."
                 )
 
             if not 0.0 <= value <= 1.0:
                 raise GuardrailError(
                     f"{field_name} for "
-                    f"'{opportunity.criterion_id}' "
+                    f"'{criterion_id}' "
                     "must be between 0.0 and 1.0."
                 )
 

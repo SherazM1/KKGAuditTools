@@ -2,76 +2,650 @@
   {
     "id": "eye_level_messaging",
     "category": "Messaging",
-    "applies_when": "Product or shelf-edge area is at or near eye level in frame",
-    "check": "Is there graphical/brand messaging present at eye level, not just the product itself?",
-    "suggestion": "Add eye-level graphical messaging to reinforce brand presence at the point of highest visibility"
+    "applies_when": "The product or its immediate shelf area occupies a visually prominent position and has visible space for shopper-facing communication",
+    "check": "Is there graphical or brand messaging near the product beyond the product packaging itself?",
+    "suggestion": "Add prominent graphical messaging to reinforce brand presence at a highly visible point in the shopping experience",
+    "priority": 0.8,
+    "opportunity_type": "signage",
+    "visual_signals": [
+      "prominent product position",
+      "visible shelf area",
+      "limited surrounding brand messaging",
+      "open communication space"
+    ],
+    "fixture_types": [
+      "shelf",
+      "pegboard",
+      "rack",
+      "display"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": false,
+    "opportunity_formats": [
+      "shelf_signage",
+      "graphic_panel",
+      "shelf_edge",
+      "riser"
+    ]
   },
   {
     "id": "riser_additional_messaging",
     "category": "Placement",
-    "applies_when": "Product is shelved without any raised signage or riser",
-    "check": "Is a riser present with additional brand messaging?",
-    "suggestion": "Consider adding a riser to increase messaging height and visual separation from competitors"
+    "applies_when": "Product is shelved without raised signage and visible vertical space could support additional communication",
+    "check": "Would a riser provide useful additional brand or product messaging above the current presentation?",
+    "suggestion": "Consider adding a riser to increase messaging height and visual separation from surrounding merchandise",
+    "priority": 0.85,
+    "opportunity_type": "signage",
+    "visual_signals": [
+      "unused vertical space",
+      "product sitting directly on shelf",
+      "no raised messaging",
+      "limited vertical brand presence"
+    ],
+    "fixture_types": [
+      "shelf",
+      "rack",
+      "display"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": false,
+    "opportunity_formats": [
+      "riser",
+      "header",
+      "vertical_signage"
+    ]
   },
   {
     "id": "pdq_new_launch",
     "category": "Merchandising",
-    "applies_when": "A PDQ or standalone display case is present, or a new/LTO product is visible",
-    "check": "Does the PDQ highlight a new product launch, LTO, or product line extension?",
-    "suggestion": "Use PDQ space to spotlight new launches or line extensions for attention"
+    "applies_when": "A PDQ or standalone display case is present, or visible product communication indicates a launch, limited-time item, or line extension",
+    "check": "Does the presentation use dedicated display space to highlight the launch, limited-time item, or product extension?",
+    "suggestion": "Use PDQ or dedicated display space to spotlight launches or line extensions and create a stronger product destination",
+    "priority": 0.85,
+    "opportunity_type": "pdq",
+    "visual_signals": [
+      "PDQ present",
+      "standalone display case",
+      "launch messaging",
+      "new product callout",
+      "limited-time messaging"
+    ],
+    "fixture_types": [
+      "pdq",
+      "shelf",
+      "display"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": true,
+    "existing_fixture_required": false,
+    "opportunity_formats": [
+      "pdq",
+      "tray",
+      "counter_display",
+      "shelf_display"
+    ]
   },
   {
     "id": "stackable_opportunity",
     "category": "Placement",
-    "applies_when": "Product packaging shape is stackable (boxes, cans, etc.)",
-    "check": "Is the product arranged to take advantage of its stackability?",
-    "suggestion": "Reconfigure into a stacked display to increase visual footprint and shelf presence",
+    "applies_when": "Product packaging shape appears physically stackable, such as boxes, cartons, cans, tubs, or similarly stable packages",
+    "check": "Is the product arranged to take advantage of its visible stackability?",
+    "suggestion": "Reconfigure into a stacked presentation when the visible package geometry and available space support it",
     "priority": 0.85,
     "opportunity_type": "display_structure",
     "visual_signals": [
       "stackable package shape",
       "unused vertical space",
-      "single-layer product arrangement"
+      "single-layer product arrangement",
+      "repeatable package geometry"
+    ],
+    "fixture_types": [
+      "shelf",
+      "floor",
+      "pallet",
+      "display"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": false,
+    "opportunity_formats": [
+      "stacked_display",
+      "shelf_stack",
+      "floor_stack",
+      "pallet_stack"
+    ]
+  },
+  {
+    "id": "cross_merch_pdq_opportunity",
+    "category": "Merchandising",
+    "applies_when": "The selected product is visibly adjacent to another product category and their relationship is supported by packaging, signage, provided context, or an obvious shared use case",
+    "check": "Could a PDQ, tray, shelf-edge element, or other display bridge the adjacent product categories more intentionally?",
+    "suggestion": "Use a PDQ, tray, or shelf-edge communication to create a clearer cross-merchandising connection where the visible context supports it",
+    "priority": 0.8,
+    "opportunity_type": "cross_merchandising",
+    "visual_signals": [
+      "adjacent product categories",
+      "related-use messaging",
+      "shared promotional area",
+      "opportunity for paired placement"
+    ],
+    "fixture_types": [
+      "shelf",
+      "pdq",
+      "rack",
+      "display"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": false,
+    "opportunity_formats": [
+      "pdq",
+      "tray",
+      "shelf_edge",
+      "cross_merch_display"
+    ]
+  },
+  {
+    "id": "brand_cohesion_callouts",
+    "category": "Messaging",
+    "applies_when": "Multiple visible brand, product, or promotional communication elements are present around the selected product",
+    "check": "Do the visible messaging elements work together visually and communicate a clear, consistent product or brand story?",
+    "suggestion": "Align visible messaging, graphics, and benefit callouts so the presentation reads as one cohesive branded experience",
+    "priority": 0.75,
+    "opportunity_type": "messaging",
+    "visual_signals": [
+      "multiple messaging elements",
+      "inconsistent graphic treatments",
+      "mixed callout styles",
+      "visible brand packaging"
+    ],
+    "fixture_types": [
+      "shelf",
+      "pdq",
+      "rack",
+      "sidekick",
+      "sidecap",
+      "endcap",
+      "floorstand",
+      "half_pallet",
+      "full_pallet"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": true,
+    "opportunity_formats": [
+      "graphic_refresh",
+      "callout_panel",
+      "header",
+      "shelf_signage"
+    ]
+  },
+  {
+    "id": "digital_pdp_tie_in",
+    "category": "Digital Overlap",
+    "applies_when": "Packaging, signage, a display, or another shopper-facing communication surface is visible",
+    "check": "Is there a visible QR code or digital element that could connect the physical shopping experience to additional product information?",
+    "suggestion": "Consider adding a QR code or other digital bridge where additional product information, education, or online content would benefit the shopper",
+    "priority": 0.55,
+    "opportunity_type": "digital",
+    "visual_signals": [
+      "shopper-facing signage",
+      "large packaging panel",
+      "display graphics",
+      "existing QR code",
+      "unused communication surface"
+    ],
+    "fixture_types": [
+      "shelf",
+      "pdq",
+      "rack",
+      "display",
+      "sidekick",
+      "sidecap",
+      "endcap",
+      "floorstand",
+      "half_pallet",
+      "full_pallet"
+    ],
+    "comparison_allowed": false,
+    "brand_context_required": false,
+    "existing_fixture_required": false,
+    "opportunity_formats": [
+      "qr_code",
+      "digital_callout",
+      "pdp_tie_in"
+    ]
+  },
+  {
+    "id": "shelf_space_utilization",
+    "category": "Placement",
+    "applies_when": "Visible shelf or pegboard space exists around the selected product",
+    "check": "Is the visible merchandising space being used effectively without meaningful gaps, weak facings, or unused allocation?",
+    "suggestion": "Adjust product quantity, facings, placement, or display footprint to make stronger use of the available merchandising space",
+    "priority": 0.85,
+    "opportunity_type": "space_utilization",
+    "visual_signals": [
+      "empty shelf space",
+      "large gaps",
+      "unused pegboard",
+      "limited facings",
+      "underfilled product area"
+    ],
+    "fixture_types": [
+      "shelf",
+      "pegboard",
+      "rack"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": true,
+    "opportunity_formats": [
+      "additional_facings",
+      "shelf_reconfiguration",
+      "rack",
+      "tray",
+      "pdq"
+    ]
+  },
+  {
+    "id": "sample_header_presence",
+    "category": "Merchandising",
+    "applies_when": "A sample, tester, trial-size, demonstration, or similar sampling presentation is visibly present",
+    "check": "Does the sample or trial presentation include a clear branded header or communication element?",
+    "suggestion": "Add or strengthen branded header messaging to connect the sampling experience to the product and brand",
+    "priority": 0.7,
+    "opportunity_type": "signage",
+    "visual_signals": [
+      "sample unit",
+      "tester display",
+      "trial-size product",
+      "sampling fixture",
+      "missing header"
+    ],
+    "fixture_types": [
+      "sample_display",
+      "counter_display",
+      "shelf",
+      "pdq"
+    ],
+    "comparison_allowed": false,
+    "brand_context_required": false,
+    "existing_fixture_required": true,
+    "opportunity_formats": [
+      "header",
+      "sample_signage",
+      "callout_panel"
+    ]
+  },
+  {
+    "id": "shelf_edge_messaging_opportunity",
+    "category": "Messaging",
+    "applies_when": "The selected product has visible shelf-edge area directly below or adjacent to it",
+    "check": "Is the shelf edge being used to communicate branding, benefits, product differentiation, or promotional information?",
+    "suggestion": "Use shelf-edge signage, strips, blades, or callouts to add communication without requiring a larger display footprint",
+    "priority": 0.8,
+    "opportunity_type": "signage",
+    "visual_signals": [
+      "visible shelf edge",
+      "blank shelf strip",
+      "limited messaging",
+      "product directly above usable shelf edge"
     ],
     "fixture_types": [
       "shelf"
     ],
     "comparison_allowed": true,
-    "brand_context_required": false
+    "brand_context_required": false,
+    "existing_fixture_required": false,
+    "opportunity_formats": [
+      "shelf_strip",
+      "shelf_talker",
+      "shelf_blade",
+      "price_rail_graphic"
+    ]
   },
   {
-    "id": "cross_merch_pdq_opportunity",
-    "category": "Merchandising",
-    "applies_when": "A complementary-use product is shelved near, but not merchandised with, its pairing product",
-    "check": "Is there a PDQ, box display, or signage bridging the two related product categories?",
-    "suggestion": "Add a PDQ tray or shelf-edge signage pairing the two products to reinforce brand cohesion"
-  },
-  {
-    "id": "brand_cohesion_callouts",
+    "id": "header_messaging_opportunity",
     "category": "Messaging",
-    "applies_when": "Shelf messaging or signage is present",
-    "check": "Does the messaging match the brand's visual identity (colors, logo, tone) and include benefit/result callouts?",
-    "suggestion": "Update messaging to align with brand identity and include clear benefit callouts"
+    "applies_when": "A fixture or product grouping has visible space above it that could support a header or topper",
+    "check": "Could a header or topper create a clearer branded destination or improve product communication?",
+    "suggestion": "Add or strengthen a header or topper when visible space and fixture structure support additional communication",
+    "priority": 0.85,
+    "opportunity_type": "signage",
+    "visual_signals": [
+      "open space above product",
+      "display without header",
+      "weak top-of-display communication",
+      "visible structural support"
+    ],
+    "fixture_types": [
+      "pdq",
+      "rack",
+      "sidekick",
+      "sidecap",
+      "endcap",
+      "floorstand",
+      "half_pallet",
+      "full_pallet",
+      "display"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": false,
+    "opportunity_formats": [
+      "header",
+      "topper",
+      "riser",
+      "vertical_signage"
+    ]
   },
   {
-    "id": "digital_pdp_tie_in",
-    "category": "Digital Overlap",
-    "applies_when": "Any signage or packaging is present",
-    "check": "Is there a QR code or digital element tying the in-store display to the online product page?",
-    "suggestion": "Add a QR code linking to the product page to bridge in-store and online presence"
+    "id": "side_panel_messaging_opportunity",
+    "category": "Messaging",
+    "applies_when": "A display, rack, fixture, or dedicated merchandising structure has a clearly visible side surface",
+    "check": "Is the visible side surface being used effectively for shopper-facing brand or product communication?",
+    "suggestion": "Use available side-panel space for branding, product benefits, education, or supporting visual communication",
+    "priority": 0.8,
+    "opportunity_type": "signage",
+    "visual_signals": [
+      "blank side panel",
+      "large visible fixture side",
+      "unused structural surface",
+      "side-facing shopper exposure"
+    ],
+    "fixture_types": [
+      "pdq",
+      "rack",
+      "sidekick",
+      "sidecap",
+      "endcap",
+      "floorstand",
+      "half_pallet",
+      "full_pallet",
+      "display"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": true,
+    "opportunity_formats": [
+      "side_panel_graphic",
+      "side_signage",
+      "benefit_callout"
+    ]
   },
   {
-    "id": "shelf_space_utilization",
+    "id": "vertical_space_opportunity",
     "category": "Placement",
-    "applies_when": "Visible shelf or pegboard space adjacent to the product",
-    "check": "Is allocated shelf space fully utilized with no significant empty gaps?",
-    "suggestion": "Restock or resize facing to eliminate empty shelf space"
+    "applies_when": "Visible unused vertical space exists above the selected product or merchandising area",
+    "check": "Could the unused vertical space support more product, stacking, signage, a riser, header, or another merchandising structure?",
+    "suggestion": "Use available vertical space for additional product presentation or branded communication when physically supported by the scene",
+    "priority": 0.85,
+    "opportunity_type": "space_utilization",
+    "visual_signals": [
+      "unused vertical space",
+      "low product height",
+      "single-level presentation",
+      "open space above fixture"
+    ],
+    "fixture_types": [
+      "shelf",
+      "rack",
+      "display",
+      "floor"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": false,
+    "opportunity_formats": [
+      "stacking",
+      "riser",
+      "header",
+      "rack",
+      "taller_display"
+    ]
   },
   {
-    "id": "sample_header_presence",
+    "id": "dedicated_display_opportunity",
+    "category": "Display Structure",
+    "applies_when": "The selected product is merchandised on a standard shelf, pegboard, floor area, or other non-dedicated presentation and visible evidence suggests a dedicated structure could improve its presence",
+    "check": "Would a dedicated merchandising structure create stronger product organization, visibility, capacity, or branded communication?",
+    "suggestion": "Consider an appropriately scaled dedicated display such as a PDQ, rack, sidekick, sidecap, endcap, floorstand, half-pallet, or full-pallet when the visible product volume, package form, and retail environment support it",
+    "priority": 0.95,
+    "opportunity_type": "display_structure",
+    "visual_signals": [
+      "product merchandised on standard shelving",
+      "multiple visible units",
+      "repeatable package geometry",
+      "limited dedicated branding",
+      "large product grouping",
+      "available floor or fixture space",
+      "secondary merchandising potential"
+    ],
+    "fixture_types": [
+      "shelf",
+      "pegboard",
+      "floor",
+      "rack",
+      "existing_display"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": false,
+    "opportunity_formats": [
+      "pdq",
+      "rack",
+      "sidekick",
+      "sidecap",
+      "endcap",
+      "floorstand",
+      "half_pallet",
+      "full_pallet"
+    ]
+  },
+  {
+    "id": "large_display_surface_utilization",
+    "category": "Display Structure",
+    "applies_when": "A sidekick, sidecap, endcap, floorstand, pallet display, rack, or similarly substantial dedicated display structure is visible",
+    "check": "Are the available front, side, header, and structural surfaces being used effectively for product presentation and communication?",
+    "suggestion": "Use available display surfaces more intentionally for coordinated branding, messaging, navigation, and product presentation",
+    "priority": 0.9,
+    "opportunity_type": "display_structure",
+    "visual_signals": [
+      "large dedicated fixture",
+      "unused header area",
+      "blank side panels",
+      "underused graphic surfaces",
+      "large display footprint"
+    ],
+    "fixture_types": [
+      "sidekick",
+      "sidecap",
+      "endcap",
+      "floorstand",
+      "rack",
+      "half_pallet",
+      "full_pallet"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": true,
+    "opportunity_formats": [
+      "header",
+      "side_panel",
+      "front_panel",
+      "graphic_wrap",
+      "shelf_signage"
+    ]
+  },
+  {
+    "id": "display_capacity_utilization",
+    "category": "Placement",
+    "applies_when": "A dedicated display fixture has visible capacity for product or merchandising components",
+    "check": "Is the available display capacity being used effectively without appearing meaningfully underfilled or poorly organized?",
+    "suggestion": "Adjust product quantity, facings, shelf configuration, or display layout to better use the available fixture capacity",
+    "priority": 0.85,
+    "opportunity_type": "space_utilization",
+    "visual_signals": [
+      "empty display sections",
+      "partially filled fixture",
+      "unused shelves",
+      "open pallet footprint",
+      "low product density"
+    ],
+    "fixture_types": [
+      "pdq",
+      "rack",
+      "sidekick",
+      "sidecap",
+      "endcap",
+      "floorstand",
+      "half_pallet",
+      "full_pallet"
+    ],
+    "comparison_allowed": false,
+    "brand_context_required": false,
+    "existing_fixture_required": true,
+    "opportunity_formats": [
+      "additional_facings",
+      "shelf_reconfiguration",
+      "stacking",
+      "product_reflow"
+    ]
+  },
+  {
+    "id": "secondary_display_impact",
     "category": "Merchandising",
-    "applies_when": "A sample display or trial-size unit is present",
-    "check": "Does the sample header include brand-cohesive messaging?",
-    "suggestion": "Add branded header messaging to the sample display for cohesion"
+    "applies_when": "A sidekick, sidecap, endcap, floorstand, pallet display, or other secondary merchandising placement is present",
+    "check": "Does the secondary display create a distinct visual destination that is clearly differentiated from the surrounding primary shelf environment?",
+    "suggestion": "Strengthen the secondary display through clearer visual hierarchy, dedicated messaging, stronger product organization, or more intentional use of the fixture",
+    "priority": 0.9,
+    "opportunity_type": "secondary_display",
+    "visual_signals": [
+      "secondary placement",
+      "aisle-end display",
+      "side-of-fixture display",
+      "freestanding display",
+      "pallet merchandising"
+    ],
+    "fixture_types": [
+      "sidekick",
+      "sidecap",
+      "endcap",
+      "floorstand",
+      "half_pallet",
+      "full_pallet"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": true,
+    "opportunity_formats": [
+      "graphic_refresh",
+      "header",
+      "side_panel",
+      "reconfigured_display"
+    ]
+  },
+  {
+    "id": "product_visibility_obstruction",
+    "category": "Shelf Execution",
+    "applies_when": "Part of the selected product, package face, branding, or product communication is visibly blocked or difficult to see",
+    "check": "Is the primary product face or communication obscured by adjacent products, shelf hardware, signage, fixture components, or poor placement?",
+    "suggestion": "Adjust placement, facing, fixture structure, or surrounding components so the primary product face and communication remain visible",
+    "priority": 0.9,
+    "opportunity_type": "visibility",
+    "visual_signals": [
+      "blocked product face",
+      "shelf lip covering package",
+      "adjacent product obstruction",
+      "fixture hardware obstruction",
+      "hidden branding"
+    ],
+    "fixture_types": [
+      "shelf",
+      "pegboard",
+      "pdq",
+      "rack",
+      "sidekick",
+      "sidecap",
+      "endcap",
+      "floorstand"
+    ],
+    "comparison_allowed": false,
+    "brand_context_required": false,
+    "existing_fixture_required": true,
+    "opportunity_formats": [
+      "placement_adjustment",
+      "fixture_adjustment",
+      "facing_adjustment"
+    ]
+  },
+  {
+    "id": "facing_presentation_opportunity",
+    "category": "Shelf Execution",
+    "applies_when": "Multiple units or facings of the selected product are visible",
+    "check": "Are the visible units faced, aligned, and organized in a way that creates a clear and intentional product presentation?",
+    "suggestion": "Improve facing alignment, product orientation, or grouping to create a cleaner and more deliberate presentation",
+    "priority": 0.75,
+    "opportunity_type": "product_presentation",
+    "visual_signals": [
+      "multiple facings",
+      "misaligned packages",
+      "mixed product orientation",
+      "uneven rows",
+      "disorganized grouping"
+    ],
+    "fixture_types": [
+      "shelf",
+      "pdq",
+      "rack",
+      "display",
+      "sidekick",
+      "sidecap",
+      "endcap"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": true,
+    "opportunity_formats": [
+      "facing_adjustment",
+      "tray",
+      "product_divider",
+      "rack"
+    ]
+  },
+  {
+    "id": "visual_separation_opportunity",
+    "category": "Merchandising",
+    "applies_when": "The selected product visually blends into surrounding merchandise or lacks a clear visual boundary from adjacent products",
+    "check": "Would additional structure, spacing, signage, color, or branded communication help the selected product read as a more distinct destination?",
+    "suggestion": "Create stronger visual separation using an appropriate combination of signage, spacing, fixture structure, branded graphics, or dedicated merchandising",
+    "priority": 0.8,
+    "opportunity_type": "visual_separation",
+    "visual_signals": [
+      "selected product blends with neighboring products",
+      "weak visual boundary",
+      "dense competitive shelf",
+      "limited branded distinction"
+    ],
+    "fixture_types": [
+      "shelf",
+      "pegboard",
+      "pdq",
+      "rack",
+      "display"
+    ],
+    "comparison_allowed": true,
+    "brand_context_required": false,
+    "existing_fixture_required": false,
+    "opportunity_formats": [
+      "signage",
+      "rack",
+      "pdq",
+      "divider",
+      "sidekick",
+      "branded_fixture"
+    ]
   }
 ]

@@ -1,8 +1,12 @@
 """
-Audit mode configuration.
 
-Modes change audit depth and output volume.
-They do NOT require the user to choose a criteria category.
+Audit mode and depth configuration.
+
+Audit mode controls what part of the scene is being analyzed.
+Audit depth controls reasoning depth, confidence thresholds,
+and output volume.
+
+Neither requires the user to choose a criteria category.
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ class AuditDepthConfig:
     depth: AuditDepth
     label: str
     description: str
+    max_candidates: int
     max_opportunities: int
     include_secondary: bool
     deep_reasoning: bool
@@ -57,7 +62,8 @@ DEPTH_CONFIGS = {
     AuditDepth.QUICK: AuditDepthConfig(
         depth=AuditDepth.QUICK,
         label="Quick Audit",
-        description="A fast audit that prioritizes speed and simplicityover depth.",
+        description="A fast audit that prioritizes the strongest, visible opportunities.",
+        max_candidates = 8,
         max_opportunities=4,
         include_secondary=False,
         deep_reasoning=False,
@@ -67,7 +73,8 @@ DEPTH_CONFIGS = {
     AuditDepth.DEEP: AuditDepthConfig(
         depth=AuditDepth.DEEP,
         label="Deep Audit",
-        description="A thorough audit that prioritizes depth and stronger reasoning over speed.",
+        description="A thorough audit that prioritizes depth and a broader set of opportunities.",
+        max_candidates=14,
         max_opportunities=8,
         include_secondary=True,
         deep_reasoning=True,

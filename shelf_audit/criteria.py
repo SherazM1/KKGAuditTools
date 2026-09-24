@@ -6,7 +6,7 @@ It does not import Streamlit or any AI SDK.
 """
 
 from __future__ import annotations
-
+import math
 import json
 from pathlib import Path
 from typing import Any
@@ -29,6 +29,8 @@ OPTIONAL_FIELDS = {
     "fixture_types",
     "comparison_allowed",
     "brand_context_required",
+    "existing_fixture_required",
+    "opportunity_formats",
 }
 
 
@@ -118,6 +120,7 @@ def _validate_criterion(
     for field in {
         "visual_signals",
         "fixture_types",
+        "opportunity_formats",
     }:
         if field in criterion:
             value = criterion[field]
@@ -155,6 +158,7 @@ def _validate_criterion(
     for field in {
         "comparison_allowed",
         "brand_context_required",
+        "existing_fixture_required"
     }:
         if field in criterion:
             value = criterion[field]
@@ -174,12 +178,19 @@ def _validate_criterion(
     if "priority" in criterion:
         value = criterion["priority"]
 
-        if not isinstance(value, (int, float)):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+
+        ):
             raise CriteriaError(
                 f"Criterion #{index + 1} field 'priority' must be numeric."
             )
 
-        if not 0.0 <= value <= 1.0:
+        if (
+            not math.isfinite(value)
+            or not 0.0 <= value <= 1.0
+        ):
             raise CriteriaError(
                 f"Criterion #{index + 1} field 'priority' "
                 "must be between 0.0 and 1.0."
@@ -304,11 +315,12 @@ def filter_criteria(
             if criterion["category"] == category
         ]
 
-    if ids:
+    if ids is not None:
         filtered = [
             criterion
             for criterion in filtered
             if criterion["id"] in ids
+
         ]
 
     return filtered

@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 from io import BytesIO
 from pathlib import Path
-
+import math
 from PIL import Image, ImageOps
 
 from .models import AuditImage, TargetRegion
@@ -28,11 +28,88 @@ SUPPORTED_MEDIA_TYPES = {
 }
 
 MAX_IMAGE_DIMENSION = 2048
+MAX_RAW_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_IMAGE_PIXELS = 50_000_000
 JPEG_QUALITY = 85
 
 
 class ImageProcessingError(ValueError):
     """Raised when an image cannot be safely processed."""
+
+
+def _inspect_image_bytes(
+    data: bytes,
+) -> tuple[str, int, int]:
+    """
+    Inspect actual image contents without trusting filename
+    or upload MIME metadata.
+
+    Returns:
+        media_type, width, height
+    """
+
+    if not isinstance(data, bytes):
+        raise ImageProcessingError(
+            "Image data must be bytes."
+        )
+
+    if not data:
+        raise ImageProcessingError(
+            "Image data is empty."
+        )
+
+    if len(data) > MAX_RAW_IMAGE_BYTES:
+        raise ImageProcessingError(
+            "Image file is too large."
+        )
+
+    try:
+        with Image.open(
+            BytesIO(data)
+        ) as opened:
+
+            image_format = (
+                opened.format or ""
+            ).upper()
+
+            if image_format == "JPEG":
+                media_type = "image/jpeg"
+
+            elif image_format == "PNG":
+                media_type = "image/png"
+
+            else:
+                raise ImageProcessingError(
+                    "Only JPEG and PNG images are supported."
+                )
+
+            width, height = opened.size
+
+    except ImageProcessingError:
+        raise
+
+    except Exception as exc:
+        raise ImageProcessingError(
+            "The image could not be decoded."
+        ) from exc
+
+    if width <= 0 or height <= 0:
+        raise ImageProcessingError(
+            "Image dimensions must be greater than zero."
+        )
+
+    pixel_count = width * height
+
+    if pixel_count > MAX_IMAGE_PIXELS:
+        raise ImageProcessingError(
+            "Image dimensions are too large."
+        )
+
+    return (
+        media_type,
+        width,
+        height,
+    )
 
 
 def detect_media_type(
@@ -65,31 +142,47 @@ def build_audit_image(
     source: str | None = None,
 ) -> AuditImage:
     """
-    Normalize any image source into an AuditImage.
+    Validate an image source and normalize it into an AuditImage.
+
+    Actual image contents are authoritative. Filename and declared
+    MIME type are treated only as supporting metadata.
     """
 
-    if not isinstance(data, bytes):
-        raise ImageProcessingError(
-            "Image data must be bytes."
-        )
-
-    if not data:
-        raise ImageProcessingError(
-            "Image data is empty."
-        )
-
-    resolved_media_type = detect_media_type(
-        filename=filename,
-        provided_type=media_type,
+    (
+        actual_media_type,
+        _,
+        _,
+    ) = _inspect_image_bytes(
+        data
     )
+
+    if media_type in SUPPORTED_MEDIA_TYPES:
+        if media_type != actual_media_type:
+            raise ImageProcessingError(
+                "The image contents do not match the declared image type."
+            )
+
+    if filename:
+        suffix = Path(filename).suffix.lower()
+
+        expected_type = ALLOWED_EXTENSIONS.get(
+            suffix
+        )
+
+        if (
+            expected_type is not None
+            and expected_type != actual_media_type
+        ):
+            raise ImageProcessingError(
+                "The image contents do not match the file extension."
+            )
 
     return AuditImage(
         data=data,
-        media_type=resolved_media_type,
+        media_type=actual_media_type,
         filename=filename,
         source=source,
     )
-
 
 def preprocess_audit_image(
     image: AuditImage,
@@ -111,6 +204,10 @@ def preprocess_audit_image(
         raise ImageProcessingError(
             "jpeg_quality must be between 1 and 100."
         )
+
+    actual_media_type, _, _ = _inspect_image_bytes(
+        image.data
+    )
 
     try:
         source = Image.open(
@@ -139,7 +236,7 @@ def preprocess_audit_image(
 
         output = BytesIO()
 
-        if image.media_type == "image/png":
+        if actual_media_type == "image/png":
             processed.save(
                 output,
                 format="PNG",
@@ -186,14 +283,23 @@ def get_image_dimensions(
     image: AuditImage,
 ) -> tuple[int, int]:
     """
-    Return image width and height.
+    Return orientation-correct image width and height.
     """
+
+    _inspect_image_bytes(
+        image.data
+    )
 
     try:
         with Image.open(
             BytesIO(image.data)
         ) as opened:
-            return opened.size
+
+            oriented = ImageOps.exif_transpose(
+                opened
+            )
+
+            return oriented.size
 
     except Exception as exc:
         raise ImageProcessingError(
@@ -217,6 +323,26 @@ def normalize_target_region(
     This keeps selections stable across different screen sizes
     and processed image resolutions.
     """
+
+
+    values = {
+        "x": x,
+        "y": y,
+        "width": width,
+        "height": height,
+        "canvas_width": canvas_width,
+        "canvas_height": canvas_height,
+    }
+
+    for name, value in values.items():
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+        ):
+            raise ImageProcessingError(
+                f"{name} must be a finite number."
+            )
 
     if canvas_width <= 0 or canvas_height <= 0:
         raise ImageProcessingError(
