@@ -37,6 +37,8 @@ def require_access_code() -> None:
 
     st.stop()
 
+require_access_code()
+
 # Add future module renderers here as they become available.
 ROUTES = {
     "shelf_audit": shelf_audit_page.render,
