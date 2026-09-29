@@ -388,6 +388,40 @@ def crop_target_region(
     The full image remains unchanged. This returns a separate
     AuditImage containing only the selected target product.
     """
+    region_values = {
+        "x": target_region.x,
+        "y": target_region.y,
+        "width": target_region.width,
+        "height": target_region.height,
+    }
+
+    for name, value in region_values.items():
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+        ):
+            raise ImageProcessingError(
+                f"Target region {name} must be a finite number."
+            )
+
+    if (
+        target_region.x < 0.0
+        or target_region.y < 0.0
+        or target_region.width <= 0.0
+        or target_region.height <= 0.0
+    ):
+        raise ImageProcessingError(
+            "Target region must be within normalized image bounds."
+        )
+
+    if (
+        target_region.x + target_region.width > 1.0
+        or target_region.y + target_region.height > 1.0
+    ):
+        raise ImageProcessingError(
+            "Target region extends beyond normalized image bounds."
+        )
 
     try:
         source = Image.open(
@@ -408,15 +442,15 @@ def crop_target_region(
 
         image_width, image_height = oriented.size
 
-        left = round(
+        left = math.floor(
             target_region.x * image_width
         )
 
-        top = round(
+        top = math.floor(
             target_region.y * image_height
         )
 
-        right = round(
+        right = math.ceil(
             (
                 target_region.x
                 + target_region.width
@@ -424,7 +458,7 @@ def crop_target_region(
             * image_width
         )
 
-        bottom = round(
+        bottom = math.ceil(
             (
                 target_region.y
                 + target_region.height

@@ -69,7 +69,7 @@ class MemoryRateLimiter:
         Return how many requests remain in the current window.
         """
 
-        now = time.time()
+        now = time.monotonic()
 
         self._cleanup(
             key,
@@ -94,7 +94,7 @@ class MemoryRateLimiter:
         Raise RateLimitError if the caller has exceeded the limit.
         """
 
-        now = time.time()
+        now = time.monotonic()
 
         self._cleanup(
             key,
@@ -124,7 +124,7 @@ class MemoryRateLimiter:
         Record a successful request attempt.
         """
 
-        now = time.time()
+        now = time.monotonic()
 
         self._cleanup(
             key,
