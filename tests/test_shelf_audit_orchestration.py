@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import unittest
+from unittest.mock import Mock
 
 from PIL import Image
 
@@ -19,6 +20,7 @@ from shelf_audit.criteria import (
 )
 from shelf_audit.infrastructure.cache import MemoryAuditCache
 from shelf_audit.infrastructure.rate_limit import MemoryRateLimiter
+from shelf_audit.infrastructure.usage import MemoryUsageTracker
 from shelf_audit.models import (
     AuditDepth,
     AuditImage,
@@ -27,8 +29,13 @@ from shelf_audit.models import (
     TargetRegion,
 )
 from shelf_audit.opportunity import Opportunity
-from shelf_audit.providers.base import AuditProvider
-
+from shelf_audit.providers.base import (
+    AuditProvider,
+    ProviderAnalysisResult,
+    ProviderConfigurationError,
+    ProviderTimeoutError,
+    ProviderUsage,
+)
 
 def _make_test_image() -> AuditImage:
     """
@@ -63,7 +70,7 @@ class CountingProvider(AuditProvider):
 
     name = "counting_test"
     model_name = "test-model"
-    config_version = "1"
+    config_version = "3"
 
     def __init__(self) -> None:
         self.calls = 0
@@ -71,7 +78,7 @@ class CountingProvider(AuditProvider):
     def analyze(
         self,
         request: AuditRequest,
-    ) -> list[Opportunity]:
+    ) -> ProviderAnalysisResult:
         self.calls += 1
 
         available_ids = {
@@ -85,7 +92,7 @@ class CountingProvider(AuditProvider):
             else next(iter(available_ids))
         )
 
-        return [
+        opportunities = [
             Opportunity(
                 criterion_id=criterion_id,
                 title="Test opportunity",
@@ -97,6 +104,15 @@ class CountingProvider(AuditProvider):
                 actionability=0.90,
             )
         ]
+
+        return ProviderAnalysisResult(
+            opportunities=opportunities,
+            usage=ProviderUsage(
+                estimated_cost=0.0,
+                provider_called=False,
+                attempt_count=0,
+            )
+        )
 
 
 class FailingWriteCache:
@@ -129,6 +145,97 @@ class ShelfAuditOrchestrationTests(
     def setUp(self) -> None:
         self.image = _make_test_image()
         self.criteria = load_criteria()
+
+    def _run(self, provider, **kwargs):
+        return run_audit(
+            image=self.image,
+            criteria=self.criteria,
+            mode=AuditMode.PRODUCT,
+            depth=AuditDepth.QUICK,
+            provider=provider,
+            **kwargs,
+        )
+
+    def test_disabled_openai_cache_miss_blocks_before_limiter(self):
+        provider = CountingProvider()
+        provider.name = "openai"
+        tracker = MemoryUsageTracker()
+        limiter = Mock()
+        with self.assertRaises(ProviderConfigurationError):
+            self._run(provider, ai_enabled=False, cache=MemoryAuditCache(),
+                      rate_limiter=limiter, rate_limit_key="test-user",
+                      usage_tracker=tracker)
+        self.assertEqual(provider.calls, 0)
+        limiter.check_and_record.assert_not_called()
+        record = tracker.all()[0]
+        self.assertFalse(record.success)
+        self.assertFalse(record.provider_called)
+        self.assertEqual(record.attempt_count, 0)
+        self.assertEqual(record.error_type, "ProviderConfigurationError")
+
+    def test_disabled_openai_cache_hit_bypasses_provider_and_limiter(self):
+        provider = CountingProvider()
+        provider.name = "openai"
+        cache = MemoryAuditCache()
+        cached = self._run(provider, cache=cache)
+        provider.analyze = Mock(side_effect=AssertionError("Unexpected provider call"))
+        tracker = MemoryUsageTracker()
+        limiter = Mock()
+        result = self._run(provider, ai_enabled=False, cache=cache,
+                           rate_limiter=limiter, rate_limit_key="test-user",
+                           usage_tracker=tracker)
+        self.assertEqual(result, cached)
+        provider.analyze.assert_not_called()
+        limiter.check_and_record.assert_not_called()
+        record = tracker.all()[0]
+        self.assertTrue(record.cache_hit)
+        self.assertFalse(record.provider_called)
+        self.assertEqual(record.attempt_count, 0)
+        self.assertEqual(record.estimated_cost, 0.0)
+
+    def test_disabled_ai_allows_non_openai_provider(self):
+        provider = CountingProvider()
+        result = self._run(provider, ai_enabled=False)
+        self.assertEqual(provider.calls, 1)
+        self.assertEqual(len(result.opportunities), 1)
+
+    def test_ai_enabled_requires_real_bool(self):
+        provider = CountingProvider()
+        with self.assertRaises(ProviderConfigurationError):
+            self._run(provider, ai_enabled=0)
+        self.assertEqual(provider.calls, 0)
+
+    def test_failure_attempt_metadata_reaches_usage_tracker(self):
+        provider = CountingProvider()
+        error = ProviderTimeoutError("Test timeout", provider_called=True, attempt_count=1)
+        provider.analyze = Mock(side_effect=error)
+        tracker = MemoryUsageTracker()
+        with self.assertRaises(ProviderTimeoutError) as caught:
+            self._run(provider, usage_tracker=tracker)
+        self.assertIs(caught.exception, error)
+        record = tracker.all()[0]
+        self.assertTrue(record.provider_called)
+        self.assertEqual(record.attempt_count, 1)
+        self.assertEqual(record.error_type, "ProviderTimeoutError")
+
+    def test_malformed_exception_metadata_preserves_original_failure(self):
+        class BadMetadataError(Exception):
+            @property
+            def provider_called(self):
+                raise ValueError("Invalid metadata")
+
+            attempt_count = "invalid"
+
+        error = BadMetadataError("Original failure")
+        provider = CountingProvider()
+        provider.analyze = Mock(side_effect=error)
+        tracker = MemoryUsageTracker()
+        with self.assertRaises(BadMetadataError) as caught:
+            self._run(provider, usage_tracker=tracker)
+        self.assertIs(caught.exception, error)
+        record = tracker.all()[0]
+        self.assertFalse(record.provider_called)
+        self.assertEqual(record.attempt_count, 0)
 
     def test_invalid_criteria_never_calls_provider(
         self,

@@ -9,9 +9,7 @@ Current foundation:
 - ranked opportunities
 - target-region image helpers
 - single-target Expanded mode selection
-- mock provider for development
-
-Real AI provider will be connected later.
+- OpenAI provider controlled by server-side AI enablement
 """
 
 import streamlit as st
@@ -28,7 +26,8 @@ from .image_utils import (
     preprocess_audit_image,
 )
 from .models import AuditMode, AuditDepth
-from .providers.mock import MockAuditProvider
+from .providers.base import ProviderConfigurationError
+from .providers.openai import OpenAIAuditProvider, OpenAIProviderConfig
 from .infrastructure.cache import MemoryAuditCache
 from .infrastructure.rate_limit import MemoryRateLimiter, RateLimitError
 from .infrastructure.usage import MemoryUsageTracker
@@ -171,6 +170,20 @@ def _rectangle_coordinates(
 def render():
     """Render the Shelf Audit workflow within the parent hub."""
     st.title("Shelf Audit Tool")
+
+    try:
+        ai_enabled = st.secrets.get("AI_ENABLED", False)
+    except FileNotFoundError:
+        ai_enabled = False
+    except Exception:
+        st.error("AI analysis is not configured correctly. Contact the app owner.")
+        st.stop()
+        return
+
+    if not isinstance(ai_enabled, bool):
+        st.error("AI analysis is not configured correctly. Contact the app owner.")
+        st.stop()
+        return
 
     if "shelf_audit_cache" not in st.session_state:
         st.session_state["shelf_audit_cache"] = MemoryAuditCache()
@@ -534,7 +547,33 @@ def render():
 
             try:
 
-                provider = MockAuditProvider()
+                api_key = None
+                if ai_enabled:
+                    try:
+                        api_key = st.secrets.get("OPENAI_API_KEY", None)
+                    except Exception:
+                        raise ProviderConfigurationError(
+                            "AI configuration is unavailable."
+                        ) from None
+                    if not isinstance(api_key, str) or not api_key.strip():
+                        raise ProviderConfigurationError(
+                            "AI configuration is incomplete."
+                        )
+
+                provider = OpenAIAuditProvider(
+                    config=OpenAIProviderConfig(
+                        model_name="gpt-6.1-sol",
+                        request_timeout_seconds=45.0,
+                        max_output_tokens=3000,
+                        max_retries=0,
+                        network_enabled=ai_enabled,
+                        input_cost_per_million_tokens=2.0,
+                        output_cost_per_million_tokens=10.0,
+                        reasoning_effort="low",
+                        image_detail="high",
+                    ),
+                    api_key=api_key,
+                )
 
                 with st.spinner(
                     "Analyzing shelf opportunities..."
@@ -551,7 +590,8 @@ def render():
                         cache=st.session_state["shelf_audit_cache"],
                         rate_limiter=st.session_state["shelf_audit_rate_limiter"],
                         rate_limit_key="shelf_audit",
-                        usage_tracker=st.session_state["shelf_audit_usage_tracker"]
+                        usage_tracker=st.session_state["shelf_audit_usage_tracker"],
+                        ai_enabled=ai_enabled,
                     )
 
             except GuardrailError as exc:
@@ -570,10 +610,19 @@ def render():
 
                 st.stop()
 
-            except Exception as exc:
+            except ProviderConfigurationError:
 
                 st.error(
-                    f"The audit could not be completed: {exc}"
+                    "AI analysis is not configured correctly. Contact the app owner."
+                    if ai_enabled else "AI analysis is currently disabled."
+                )
+
+                st.stop()
+
+            except Exception:
+
+                st.error(
+                    f"The audit could not be completed. Please try again later or contact the app owner."
                 )
 
                 st.stop()

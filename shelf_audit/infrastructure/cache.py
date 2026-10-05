@@ -16,7 +16,7 @@ from ..image_utils import hash_image
 from ..models import AuditImage, AuditMode, AuditDepth, TargetRegion
 from ..prompts import PROMPT_VERSION
 
-AUDIT_CONFIG_VERSION = 1 
+AUDIT_CONFIG_VERSION = 3
 
 
 def _stable_json(data: Any) -> str:

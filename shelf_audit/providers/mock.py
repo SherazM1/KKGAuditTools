@@ -12,17 +12,17 @@ from __future__ import annotations
 
 from ..models import AuditMode, AuditRequest
 from ..opportunity import Opportunity
-from .base import AuditProvider
+from .base import AuditProvider, ProviderAnalysisResult, ProviderUsage
 
 
 class MockAuditProvider(AuditProvider):
     name = "mock"
-    config_version = "2"
+    config_version = "3"
 
     def analyze(
         self,
         request: AuditRequest,
-    ) -> list[Opportunity]:
+    ) -> ProviderAnalysisResult:
         """
         Return predictable candidate opportunities.
 
@@ -333,4 +333,11 @@ class MockAuditProvider(AuditProvider):
             actionability=0.76,
         )
 
-        return opportunities
+        return ProviderAnalysisResult(
+            opportunities=opportunities,
+            usage=ProviderUsage(
+                provider_called=True,
+                attempt_count=0,
+                estimated_cost=0.0
+            )
+        )

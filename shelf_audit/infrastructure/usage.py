@@ -29,11 +29,19 @@ class AuditUsageRecord:
 
     duration_seconds: float
 
+    provider_called: bool = False
+
     model_name: str | None = None
 
     input_tokens: int | None = None
     output_tokens: int | None = None
+    total_tokens: int | None = None
+
     estimated_cost: float | None = None
+
+    provider_request_id: str | None = None
+
+    attempt_count: int = 0
 
     error_type: str | None = None
 

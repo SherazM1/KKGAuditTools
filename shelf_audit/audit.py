@@ -36,6 +36,7 @@ from .models import (
     AuditRequest,
     AuditResult,
 )
+from .providers.base import ProviderAnalysisResult, ProviderConfigurationError
 from .prioritization import prioritize_opportunities
 from .criteria import validate_criteria
 
@@ -71,6 +72,7 @@ def run_audit(
     rate_limiter=None,
     rate_limit_key: str | None = None,
     usage_tracker=None,
+    ai_enabled: bool = True,
 ) -> AuditResult:
     """
     Run one audit through the provider-neutral pipeline.
@@ -101,6 +103,14 @@ def run_audit(
         None,
     )
 
+    provider_called= False
+    attempt_count = 0
+    input_tokens = None
+    output_tokens = None
+    total_tokens = None
+    estimated_cost = None
+    provider_request_id = None
+
     mode_value = getattr(
         mode,
         "value",
@@ -122,6 +132,9 @@ def run_audit(
         # -------------------------------------------------
         # Input validation
         # -------------------------------------------------
+
+        if not isinstance(ai_enabled, bool):
+            raise ProviderConfigurationError("ai_enabled must be a boolean.")
 
         validate_image(image)
 
@@ -214,6 +227,9 @@ def run_audit(
                         cached_result.opportunities
                     ),
                     duration_seconds=duration,
+                    provider_called=False,
+                    attempt_count=0,
+                    estimated_cost=0.0,
                 ),
             )
 
@@ -223,6 +239,9 @@ def run_audit(
         # Rate limiting
         # Only applied on cache miss
         # -------------------------------------------------
+
+        if provider_name == "openai" and ai_enabled is False:
+            raise ProviderConfigurationError("OpenAI audits are disabled.")
 
         if rate_limiter is None and rate_limit_key is not None:
             raise ValueError(
@@ -246,10 +265,47 @@ def run_audit(
         # -------------------------------------------------
         # Provider execution
         # -------------------------------------------------
+        provider_result = provider.analyze(
+    request
+)
 
-        opportunities = provider.analyze(
-            request
+        if not isinstance(
+            provider_result,
+            ProviderAnalysisResult
+        ):
+            raise TypeError("Provider returned an invalid result.")
+
+        opportunities = provider_result.opportunities
+
+        provider_called = (
+            provider_result.usage.provider_called
+            )
+
+        attempt_count = (
+            provider_result.usage.attempt_count
         )
+
+        input_tokens = (
+            provider_result.usage.input_tokens
+        )
+
+        output_tokens = (
+            provider_result.usage.output_tokens
+        )
+
+        total_tokens = (
+            provider_result.usage.total_tokens
+        )
+
+        estimated_cost = (
+            provider_result.usage.estimated_cost
+        )
+
+        provider_request_id = (
+            provider_result.usage.provider_request_id
+        )
+
+
 
         # -------------------------------------------------
         # Provider output guardrails
@@ -322,12 +378,29 @@ def run_audit(
                     result.opportunities
                 ),
                 duration_seconds=duration,
+                provider_called=provider_called,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
+                estimated_cost=estimated_cost,
+                provider_request_id=provider_request_id,
+                attempt_count=attempt_count,
             ),
         )
 
         return result
 
     except Exception as exc:
+        # Exception metadata is best-effort and must not mask the failure.
+        try:
+            provider_called = bool(getattr(exc, "provider_called", provider_called))
+        except Exception:
+            pass
+        try:
+            attempt_count = int(getattr(exc, "attempt_count", attempt_count))
+        except Exception:
+            pass
+
         duration = perf_counter() - start_time
 
         _record_usage_safely(
@@ -342,6 +415,13 @@ def run_audit(
                 criteria_count=criteria_count,
                 opportunity_count=0,
                 duration_seconds=duration,
+                provider_called=provider_called,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
+                estimated_cost=estimated_cost,
+                provider_request_id=provider_request_id,
+                attempt_count=attempt_count,
                 error_type=type(exc).__name__,
             ),
         )

@@ -334,7 +334,7 @@ class ShelfAuditInfrastructureTests(unittest.TestCase):
         )
 
         with patch(
-            "shelf_audit.infrastructure.rate_limit.time.time",
+            "shelf_audit.infrastructure.rate_limit.time.monotonic",
             side_effect=[
                 100.0,
                 101.0,

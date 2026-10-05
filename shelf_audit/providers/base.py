@@ -7,6 +7,7 @@ All real or mock AI providers should follow this contract.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from ..models import AuditRequest
 from ..opportunity import Opportunity
@@ -21,6 +22,11 @@ class ProviderError(RuntimeError):
     """
     Base error for provider-specific failures.
     """
+    def __init__(self, message: str, *, provider_called: bool = False, attempt_count: int = 0) -> None:
+        super().__init__(message)
+        self.provider_called = provider_called
+        self.attempt_count = attempt_count
+
 
 
 class ProviderConfigurationError(ProviderError):
@@ -61,6 +67,43 @@ class ProviderResponseError(ProviderError):
 
 
 # ---------------------------------------------------------
+# Provider result metadata
+# ---------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ProviderUsage:
+    """
+    Usage metadata reported or calculated for one provider execution.
+
+    Mock and other nonbillable providers should leave
+    provider_called=False and token fields unset.
+    """
+
+    provider_called: bool = False
+
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+
+    estimated_cost: float | None = None
+
+    provider_request_id: str | None = None
+
+    attempt_count: int = 0
+
+
+@dataclass(frozen=True)
+class ProviderAnalysisResult:
+    """
+    Complete provider result returned to audit orchestration.
+    """
+
+    opportunities: list[Opportunity]
+    usage: ProviderUsage
+
+
+# ---------------------------------------------------------
 # Provider interface
 # ---------------------------------------------------------
 
@@ -76,15 +119,15 @@ class AuditProvider(ABC):
     # Nonsecret revision for provider behavior/configuration.
     # Increment when provider behavior changes in a way that
     # should invalidate cached audit results.
-    config_version: str = "1"
+    config_version: str = "3"
 
     @abstractmethod
     def analyze(
         self,
         request: AuditRequest,
-    ) -> list[Opportunity]:
+    ) -> ProviderAnalysisResult:
         """
-        Analyze one audit request and return candidate opportunities.
+        Analyze one audit request.
 
         Provider implementations are responsible for:
         - prompt construction
@@ -92,9 +135,11 @@ class AuditProvider(ABC):
         - API execution
         - strict response parsing
         - provider-specific error mapping
+        - provider usage metadata
 
         Application-level validation, prioritization, caching,
-        and rate limiting remain outside the provider.
+        rate limiting, and telemetry storage remain outside
+        the provider.
         """
 
         raise NotImplementedError
