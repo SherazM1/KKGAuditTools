@@ -25,12 +25,26 @@ REQUIRED_FIELDS = {
 OPTIONAL_FIELDS = {
     "priority",
     "opportunity_type",
+    "opportunity_scale",
+    "commercial_leverage",
     "visual_signals",
     "fixture_types",
     "comparison_allowed",
     "brand_context_required",
     "existing_fixture_required",
     "opportunity_formats",
+    "physical_requirements",
+    "placement_context",
+    "do_not_suggest_when",
+}
+
+ALLOWED_OPPORTUNITY_SCALES = {
+    "execution",
+    "shelf_enhancement",
+    "fixture_enhancement",
+    "dedicated_display",
+    "secondary_display",
+    "large_format",
 }
 
 
@@ -95,6 +109,7 @@ def _validate_criterion(
 
     for field in {
         "opportunity_type",
+        "opportunity_scale",
     }:
         if field in criterion:
             value = criterion[field]
@@ -113,6 +128,15 @@ def _validate_criterion(
 
             cleaned[field] = value
 
+    if "opportunity_scale" in cleaned:
+        if cleaned["opportunity_scale"] not in ALLOWED_OPPORTUNITY_SCALES:
+            allowed = ", ".join(sorted(ALLOWED_OPPORTUNITY_SCALES))
+
+            raise CriteriaError(
+                f"Criterion #{index + 1} field 'opportunity_scale' "
+                f"must be one of: {allowed}"
+            )
+
     # -------------------------------------------------
     # Optional list fields
     # -------------------------------------------------
@@ -121,6 +145,9 @@ def _validate_criterion(
         "visual_signals",
         "fixture_types",
         "opportunity_formats",
+        "physical_requirements",
+        "placement_context",
+        "do_not_suggest_when",
     }:
         if field in criterion:
             value = criterion[field]
@@ -172,31 +199,34 @@ def _validate_criterion(
             cleaned[field] = value
 
     # -------------------------------------------------
-    # Optional priority field
+    # Optional numeric fields
     # -------------------------------------------------
 
-    if "priority" in criterion:
-        value = criterion["priority"]
+    for field in {
+        "priority",
+        "commercial_leverage",
+    }:
+        if field in criterion:
+            value = criterion[field]
 
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, (int, float))
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+            ):
+                raise CriteriaError(
+                    f"Criterion #{index + 1} field '{field}' must be numeric."
+                )
 
-        ):
-            raise CriteriaError(
-                f"Criterion #{index + 1} field 'priority' must be numeric."
-            )
+            if (
+                not math.isfinite(value)
+                or not 0.0 <= value <= 1.0
+            ):
+                raise CriteriaError(
+                    f"Criterion #{index + 1} field '{field}' "
+                    "must be between 0.0 and 1.0."
+                )
 
-        if (
-            not math.isfinite(value)
-            or not 0.0 <= value <= 1.0
-        ):
-            raise CriteriaError(
-                f"Criterion #{index + 1} field 'priority' "
-                "must be between 0.0 and 1.0."
-            )
-
-        cleaned["priority"] = float(value)
+            cleaned[field] = float(value)
 
     return cleaned
 
@@ -320,7 +350,6 @@ def filter_criteria(
             criterion
             for criterion in filtered
             if criterion["id"] in ids
-
         ]
 
     return filtered
