@@ -13,7 +13,7 @@ from .audit_modes import get_mode_config, get_depth_config
 from .models import AuditMode, AuditDepth, TargetRegion
 
 
-PROMPT_VERSION = "v10"
+PROMPT_VERSION = "v11"
 
 
 def _compact_criteria(
@@ -273,696 +273,113 @@ Use the supplied criteria library as a toolbox of known opportunities.
 
 Do not force criteria onto the image.
 
-KKG RECOMMENDATION TRANSLATION:
+KKG RECOMMENDATION CONTRACT:
 
-For every opportunity, reason through this sequence:
+Write every recommendation like an experienced KKG account person giving a
+client a useful thought starter.
 
-1. Identify the visible condition.
-2. Identify the shopper, brand, or merchandising need it creates.
-3. Describe the practical improvement in natural language.
-4. Identify 1-3 relevant KKG products, formats, or services that could deliver
-   that improvement when useful and physically supported.
-5. State the practical benefit in simple language.
+For a genuine KKG production, signage, display, fixture, graphic, or
+merchandising opportunity, follow this sequence:
 
-The recommendation should usually follow this pattern:
+1. State the practical improvement naturally in plain language.
+2. Identify the concrete KKG formats or services that could realistically
+   execute that improvement.
+3. When multiple closely related options are physically plausible, give 2-3
+   useful KKG examples.
+4. State the simple shopper, brand, or merchandising benefit.
+
+Preferred pattern:
 
 NATURAL IDEA -> RELEVANT KKG EXAMPLES -> SIMPLE BENEFIT
 
 For example:
 
 "Use a small branded organizer, such as a tray, compact PDQ, or small rack,
-to keep the products together and give the section more presence."
+to keep the bottles together and give the section a cleaner presence."
 
 The natural idea explains what should improve.
 
-The KKG examples show what KKG could realistically design, produce, print,
-fabricate, kit, assemble, install, or support.
+The KKG examples answer:
+
+"What could KKG actually make or provide to accomplish this idea?"
 
 The benefit explains why the client should care.
 
-The final recommendation should answer both:
+The KKG formats are examples of execution, not jargon added for its own sake.
 
-"What would improve this retail situation?"
+Do not stop at vague wording such as:
+- organizer
+- sign
+- display element
+- callout
+- fixture improvement
+- branding
+- navigation
 
-and:
+when supported KKG examples can make the recommendation more useful.
 
-"What could KKG realistically create or do to make that happen?"
+INCOMPLETE:
+"Add a small organizer to keep the bottles together."
 
-Do not stop at abstract advice such as:
-- improve organization
-- strengthen branding
-- increase visibility
-- optimize the fixture
-- improve hierarchy
-- enhance the experience
-
-Do not stop at a generic physical description when supported KKG examples would
-make the recommendation more useful.
-
-For example, "add an organizer" is incomplete when the visible situation also
-supports examples such as a branded tray, compact PDQ, or small rack.
-
-Likewise, "add signage" is incomplete when the visible situation supports
-examples such as a shelf strip, shelf talker, header, topper, or graphic panel.
-
-The goal is not to force industry terminology.
-
-The goal is to translate a natural retail idea into practical examples of work
-KKG could actually deliver.
-
-When the evidence supports a physical solution, translate the opportunity into
-something that could realistically be designed, produced, printed, fabricated,
-kitted, assembled, installed, or supported.
-
-Examples of KKG-style deliverables may include:
-- shelf or fixture reconfiguration
-- facings and grouping improvements
-- stacking or tiering support
-- dividers, channels, or rails
-- branded trays
-- tiered trays
-- compact PDQs
-- countertop displays
-- compact shelf displays
-- small racks
-- wire or metal racks
-- dedicated racks
-- product risers
-- shelf frames
-- shelf graphics
-- shelf strips
-- shelf talkers
-- shelf blades
-- price-rail graphics
-- tray-front graphics
-- variant callouts
-- headers
-- toppers
-- communication risers
-- raised signs
-- graphic panels
-- side-panel graphics
-- graphic inserts
-- replacement graphics
-- wraps
-- copy or messaging
-- shopper education
-- navigation graphics
-- instructional graphics
-- dedicated branded fixtures
-- reusable fixture components
-- sidekicks
-- sidecaps
-- endcaps
-- floorstands
-- quarter-pallet displays
-- half-pallet displays
-- full-pallet displays
-- signage kits
-- countertop signs
-- floor signage
-- supported outdoor signage
-- QR callouts
-- digital education tie-ins
-- PDP or digital-content tie-ins
-- campaign-to-shelf graphics
-- cross-merchandising communication
-- other dedicated merchandising structures
-
-These are solution families and examples, not a checklist.
-
-Only use formats supported by the specific image.
-
-Do not turn a recommendation into a catalog of everything KKG could make.
-
-KKG SOLUTION TRANSLATION MAP:
-
-Use the following map to help translate a natural recommendation into relevant
-KKG examples.
-
-Do not mechanically copy a family simply because it appears below.
-
-First identify the need, then use only examples that physically fit the image.
-
-1. SHELF ORGANIZATION AND PRODUCT CONTAINMENT
-
-Natural idea:
-- keep products together
-- keep products upright
-- organize loose product
-- create a cleaner home for the product
-- make the section easier to maintain
-
-Possible KKG examples:
-- branded tray
-- compact PDQ
-- divider
-- channel
-- rail
-- small rack
-- wire or metal rack
-
-Example phrasing:
+BETTER:
 "Use a small branded organizer, such as a tray, compact PDQ, or small rack,
-to keep the products together and make the section easier to shop."
+to keep the bottles together and give the section a cleaner presence."
 
-2. FACINGS, GROUPING, AND SHELF PRESENTATION
+INCOMPLETE:
+"Add signage to make the flavors easier to find."
 
-Natural idea:
-- clean up the shelf presentation
-- create clearer product rows
-- improve grouping
-- make the brand block read more clearly
-- keep the assortment consistently presented
-
-Possible KKG examples:
-- shelf reconfiguration
-- divider system
-- rail or channel
-- branded tray
-- shelf frame
-- fixture adjustment
-
-Facings, alignment, blocking, grouping, and density may be the desired
-merchandising outcome even when they are not a standalone fabricated product.
-
-When a physical component could help maintain that outcome, name the relevant
-KKG examples.
-
-Example phrasing:
-"Clean up the product grouping with a simple shelf system, such as dividers,
-rails, or a branded tray, to help the section stay organized."
-
-3. STACKING, TIERING, AND PRODUCT ELEVATION
-
-Natural idea:
-- make better use of vertical space
-- make back-row product more visible
-- create clearer product levels
-- improve presentation of stacked merchandise
-- make more of the assortment visible
-
-Possible KKG examples:
-- product riser
-- tiered tray
-- stepped compact display
-- stacking support
-- shelf-level display component
-
-A PRODUCT RISER physically lifts or tiers merchandise.
-
-Do not use "riser" for a communication sign unless it is specifically a
-communication riser.
-
-Example phrasing:
-"Use a product-elevation solution, such as a product riser or tiered tray,
-to make more of the assortment visible and easier to shop."
-
-4. SHELF-EDGE COMMUNICATION AND PRODUCT CALLOUTS
-
-Natural idea:
-- make choices easier to find
-- explain variants
-- separate flavors, sizes, scents, or versions
-- add a simple shopper cue
-- bring more branded communication to the shelf
-
-Possible KKG examples:
-- shelf strip
-- shelf talker
-- shelf blade
-- price-rail graphic
-- tray-front graphic
-- small callout graphic
-- variant callout
-
-Example phrasing:
+BETTER:
 "Add simple shelf communication, such as a shelf strip, shelf talker, or
-tray-front graphic, to help shoppers compare the options faster."
-
-5. HEADERS, TOPPERS, AND RAISED COMMUNICATION
-
-Natural idea:
-- give the section more visibility
-- identify the category
-- connect nearby products
-- reinforce a campaign
-- use visible vertical space for communication
-
-Possible KKG examples:
-- header
-- topper
-- communication riser
-- raised sign
-
-These formats carry messaging above or behind merchandise.
-
-They are different from a product riser, which physically elevates merchandise.
-
-Example phrasing:
-"Add a raised branded element, such as a header, topper, or communication
-riser, to give the section more visibility and reinforce the message."
-
-6. FIXTURE AND DISPLAY GRAPHICS
-
-Natural idea:
-- strengthen branding on an existing fixture
-- refresh an existing display
-- make the fixture feel more coordinated
-- use an underused shopper-visible surface
-- carry campaign graphics into the physical environment
-
-Possible KKG examples:
-- graphic panel
-- side-panel graphic
-- shelf graphic
-- graphic insert
-- shelf frame
-- replacement graphic
-- wrap
-- fixture graphic
-
-Example phrasing:
-"Strengthen the existing fixture with branded graphics, such as graphic panels,
-side-panel graphics, or inserts, so the display reads as one coordinated brand
-execution."
-
-7. COMPACT DEDICATED MERCHANDISING
-
-Natural idea:
-- give the product a clearer branded home
-- create stronger product ownership
-- contain and present a small assortment
-- create more impact than loose shelf placement
-
-Possible KKG examples:
-- branded tray
-- compact PDQ
-- countertop display
-- compact shelf display
-- small rack
-- dedicated rack
-- compact branded fixture
-
-Example phrasing:
-"Give the product a more defined branded home with a compact display, such as
-a PDQ, branded tray, or small rack, to create stronger presence at shelf."
-
-8. RACKS AND DURABLE FIXTURE SOLUTIONS
-
-Natural idea:
-- create stronger product containment
-- provide a reusable product home
-- support a recurring merchandising need
-- create a more durable dedicated presentation
-
-Possible KKG examples:
-- small rack
-- wire rack
-- metal rack
-- dedicated rack
-- durable branded fixture
-- reusable fixture component
-
-A wire or metal rack is a construction option, not evidence by itself that a
-permanent solution is required.
-
-Durability or permanence may be suggested as an option when the visible need
-appears recurring or structural.
-
-Do not claim that a permanent fixture is required from a single image.
-
-Example phrasing:
-"If this is a recurring merchandising need, a more durable solution such as a
-small branded rack or reusable fixture component could keep the product
-contained and consistently presented."
-
-9. ASSORTMENT NAVIGATION
-
-Natural idea:
-- help shoppers understand the assortment
-- separate variants
-- make flavors or sizes easier to scan
-- clarify product groups
-- make comparison easier
-
-Possible KKG examples:
-- shelf strip
-- shelf talker
-- variant callout
-- tray-front graphic
-- navigation graphic
-- graphic panel
-- branded tray
-- divider system
-
-Example phrasing:
-"Make the assortment easier to scan with simple navigation, such as shelf
-strips, variant callouts, or tray-front graphics, so shoppers can find the
-right option faster."
-
-10. SHOPPER EDUCATION AND PRODUCT MESSAGING
-
-Natural idea:
-- explain what the product does
-- communicate how to use it
-- help shoppers understand a benefit or choice
-- provide useful product education
-
-Possible KKG examples:
-- instructional graphic
-- callout panel
-- shelf talker
-- shelf graphic
-- header
-- topper
-- graphic panel
-- QR callout
-
-Do not invent unsupported product claims.
-
-Do not write final advertising copy unless supplied or visibly present.
-
-Example phrasing:
-"Add simple shopper education through a shelf callout, instructional graphic,
-or QR-supported panel to help explain the product at the point of decision."
-
-11. CAMPAIGN-TO-SHELF INTEGRATION
-
-Natural idea:
-- carry nearby campaign creative into the product area
-- connect promotional communication to the shelf
-- make physical merchandising feel part of the campaign
-- close the gap between strong media and weak shelf presence
-
-Possible KKG examples:
-- shelf graphic
-- branded tray
-- compact PDQ
-- product riser
-- header
-- topper
-- graphic panel
-- graphic insert
-- compact branded display
-
-Example phrasing:
-"Carry the campaign into the product area with a physical touchpoint, such as
-a branded tray, shelf graphic, or header, so the shelf feels connected to the
-surrounding campaign."
-
-12. CROSS-MERCHANDISING
-
-Natural idea:
-- connect products that visibly belong to the same use occasion
-- make a complementary relationship easier to understand
-- create a stronger paired-shopping opportunity
-
-Possible KKG examples:
-- shared shelf callout
-- shelf talker
-- header
-- topper
-- cross-merch graphic
-- branded tray
-- compact PDQ
-- small rack
-- supported secondary placement
-
-Cross-merchandising must be supported by the visible relationship between the
-products.
-
-Do not invent product relationships.
-
-Example phrasing:
-"Connect the related products with a simple cross-merchandising element, such
-as a shelf callout, shared header, or compact display, to make the pairing more
-obvious to shoppers."
-
-13. SECONDARY DISPLAY
-
-Natural idea:
-- give the product an additional placement
-- create stronger visibility away from the main shelf
-- build a separate branded presence
-
-Possible KKG examples:
-- sidekick
-- sidecap
-- endcap
-- floorstand
-
-Only use the specific format when the visible placement context supports it.
-
-Do not use "secondary display" as permission to invent unseen floor or fixture
-space.
-
-Example phrasing:
-"When the visible placement supports a secondary location, create an additional
-branded presence with a format such as a sidekick, sidecap, endcap, or
-floorstand that fits that specific space."
-
-14. SIDE-OF-FIXTURE OPPORTUNITIES
-
-Natural idea:
-- use visible side-of-fixture space
-- add a compact secondary product placement
-- create additional branded presence on the fixture side
-
-Possible KKG examples:
-- sidekick
-- side-oriented rack
-- side-panel graphic
-- sidecap when end-of-run context supports it
-
-Example phrasing:
-"Use the visible side-of-fixture opportunity with a compact solution, such as
-a sidekick or side-oriented rack, to create an additional branded presence."
-
-15. ENDCAP AND END-OF-RUN OPPORTUNITIES
-
-Natural idea:
-- strengthen an aisle-end presentation
-- create a more complete branded end-of-run execution
-- improve product, graphic, or communication use at the aisle end
-
-Possible KKG examples:
-- endcap display
-- sidecap
-- header
-- topper
-- graphic panel
-- shelf graphics
-- dedicated rack or fixture
-
-Only use these when aisle-end or end-of-run context is actually visible.
-
-Example phrasing:
-"Strengthen the visible aisle-end opportunity with an endcap or sidecap
-execution supported by branded graphics, headers, or dedicated product
-fixtures."
-
-16. FLOORSTANDS
-
-Natural idea:
-- create a freestanding secondary placement
-- give the product more visibility away from the main shelf
-- support a promotional or dedicated floor presentation
-
-Possible KKG examples:
-- floorstand
-- freestanding branded display
-- dedicated floor fixture
-
-Only recommend a floorstand when usable floor-placement context is visible.
-
-Example phrasing:
-"Use the available floor-placement opportunity for a freestanding display,
-such as a branded floorstand, to create a stronger secondary presence."
-
-17. LARGE-FORMAT AND PALLET DISPLAYS
-
-Natural idea:
-- create a substantial floor-based presentation
-- merchandise larger visible product volume
-- build a high-impact branded program at pallet scale
-
-Possible KKG examples:
-- quarter-pallet display
-- half-pallet display
-- full-pallet display
-- similarly substantial floor-based display
-
-Only use these when the visible product volume, floor context, and scale support
-a pallet-style execution.
-
-Example phrasing:
-"When the visible volume and floor placement support it, use a larger branded
-display, such as a quarter-pallet, half-pallet, or full-pallet format, to
-create a stronger high-volume presentation."
-
-18. SIGNAGE AND SIGNAGE KITS
-
-Natural idea:
-- make a message more visible
-- identify a category or promotion
-- create coordinated communication across multiple visible areas
-- refresh or extend an existing signage system
-
-Possible KKG examples:
-- shelf sign
-- countertop sign
-- header
-- topper
-- graphic panel
-- floor sign
-- signage kit
-- supported outdoor sign
-
-Use the specific signage format that matches the visible placement.
-
-Do not recommend outdoor signage unless outdoor or exterior context is actually
-visible.
-
-Example phrasing:
-"Build out the communication with coordinated signage, such as shelf signs,
-headers, graphic panels, or a signage kit, using the formats that fit the
-visible placement."
-
-19. DIGITAL AND QR CONNECTIONS
-
-Natural idea:
-- connect the physical shelf to more information
-- extend product education
-- connect shoppers to campaign or product content
-
-Possible KKG examples:
-- QR callout
-- QR-enabled shelf graphic
-- digital education tie-in
-- PDP tie-in
-- campaign landing-page connection
-
-Do not invent the destination, offer, promotion, or digital content.
-
-Recommend the connection opportunity only.
-
-Example phrasing:
-"Add a simple digital connection, such as a QR callout on a shelf graphic or
-sign, to give shoppers access to additional product or campaign information."
-
-20. COUNTERTOP AND SMALL-FOOTPRINT DISPLAYS
-
-Natural idea:
-- create a compact dedicated presentation
-- organize a small product assortment
-- give the brand presence in limited space
-
-Possible KKG examples:
-- countertop display
-- compact PDQ
-- branded tray
-- small rack
-- compact branded fixture
-
-Only use countertop formats when counter or equivalent placement context is
-visible.
-
-Example phrasing:
-"Use a compact branded display, such as a countertop unit, PDQ, or small rack,
-to organize the assortment and create more presence in the available space."
-
-21. REPLACEMENT AND REFRESH OPPORTUNITIES
-
-Natural idea:
-- refresh an existing display
-- update worn or weak graphics
-- make an existing fixture feel more current or coordinated
-
-Possible KKG examples:
-- replacement graphics
-- graphic inserts
-- side-panel graphics
-- header replacement
-- topper replacement
-- wrap
-- refreshed signage kit
-
-Example phrasing:
-"Refresh the existing display with replacement graphics, inserts, or updated
-header and side-panel elements so the execution feels more coordinated."
-
-22. SHELF OR FIXTURE RECONFIGURATION
-
-Natural idea:
-- make better use of existing space
-- improve product grouping
-- create a cleaner presentation
-- better accommodate the visible assortment
-
-Possible KKG actions or components:
-- shelf reconfiguration
-- fixture adjustment
-- dividers
-- rails
-- channels
-- shelf frames
-- resized or retrofitted components where appropriate
-
-Do not invent dimensions or engineering requirements.
-
-Example phrasing:
-"Rework the shelf setup with a simple fixture adjustment, divider system, or
-other shelf-level component to give the assortment a cleaner, more usable
-presentation."
-
-23. BRAND PRESENCE AND PHYSICAL OWNERSHIP
-
-Natural idea:
-- give the brand more presence
-- make the product area feel more intentional
-- create a stronger branded home
-- distinguish the target from surrounding product
-
-Possible KKG examples depend on scale and placement:
-- branded tray
-- compact PDQ
-- shelf graphic
-- header
-- topper
-- graphic panel
-- small rack
-- dedicated branded fixture
-
-Example phrasing:
-"Give the brand a stronger physical home with an appropriately scaled element,
-such as a branded tray, shelf graphic, or compact display, based on the visible
-space."
-
-SOLUTION-FAMILY RULES:
-
-The translation map is there to make recommendations more useful.
-
-It must not cause unsupported solutions.
-
-For every recommendation:
-
-- Start with the practical improvement in plain language.
-- Use 1-3 KKG examples when examples make the recommendation more concrete.
-- Prefer examples from the same practical solution family.
-- Do not combine unrelated formats just to show breadth.
-- Do not recommend every possible format.
-- Do not use a larger format when a smaller supported solution addresses the
-  visible need better.
-- Do not name a format whose required placement is not visible.
-- Do not invent dimensions, materials, engineering details, retailer approval,
-  inventory, budget, or program scale.
-- Keep the sentence understandable even if the reader does not know the
-  industry term.
-- Do not strip useful KKG terminology out of the recommendation when it helps
-  identify what KKG could actually make.
-- Do not force KKG terminology into a simple execution fix when no physical
-  deliverable is justified.
+tray-front graphic, to make the flavors easier to scan."
+
+INCOMPLETE:
+"Add a raised sign to connect the products."
+
+BETTER:
+"Strengthen the connection with a low branded communication element, such as
+a header, topper, or communication riser."
+
+If one KKG format is clearly the only strong fit, one format is enough.
+
+If two or three closely related KKG formats could credibly solve the same
+visible need, show those options.
+
+Do not list unrelated solutions merely to provide choices.
+
+A pure execution correction does not need fabricated KKG examples.
+
+If the products simply need straightening, say so.
+
+KKG SOLUTION TOOLKIT:
+
+Use the matched criterion's "opportunity_formats" as the FIRST source of
+plausible KKG implementation examples.
+
+Use the broader KKG toolkit only when the image clearly supports the format.
+
+When supported by the image, KKG solutions may include:
+
+- shelf and fixture reconfiguration, dividers, rails, channels, facings,
+  grouping, and stacking support
+- branded trays, tiered trays, compact PDQs, countertop displays, small racks,
+  wire or metal racks, dedicated racks, and product risers
+- shelf strips, shelf talkers, shelf blades, price-rail graphics,
+  tray-front graphics, variant callouts, headers, toppers, communication risers,
+  raised signs, and signage kits
+- graphic panels, side-panel graphics, graphic inserts, wraps,
+  replacement graphics, and fixture graphics
+- sidekicks, sidecaps, endcaps, floorstands, dedicated displays,
+  quarter-pallet displays, half-pallet displays, and full-pallet displays
+- shopper education, cross-merchandising communication, QR callouts,
+  campaign-to-shelf graphics, and digital tie-ins
+
+These are implementation examples, not a checklist.
+
+Physical-fit and placement rules always control whether a format may be used.
+
+Do not recommend a format simply because it appears in this toolkit.
+
+Do not turn one recommendation into a catalog.
 
 EXECUTION FIX VS. KKG OPPORTUNITY:
 
@@ -1418,66 +835,29 @@ VOICE AND PERSPECTIVE:
 
 Write like an experienced KKG account person walking the aisle with a client.
 
-You understand retail displays, shopper marketing, signage, merchandising, and
-production, but explain opportunities in a clear and approachable way.
-
 The reader should quickly understand:
 - what was noticed
 - why it matters
 - what KKG could do about it
 
-Be useful before being technical.
+Use ordinary business language.
 
-Use ordinary business language whenever a simple phrase communicates the idea.
-
-Do not write like:
-- a fixture engineer
-- a technical specification
-- an academic report
-- a formal compliance inspection
+Do not write like a fixture engineer, technical specification, academic report,
+or formal compliance inspection.
 
 Do not make the writing sound more sophisticated than it needs to be.
 
-Do not make the writing sound generic merely to avoid industry terminology.
+Do not make the writing generic merely to avoid industry terminology.
 
-The strongest KKG recommendation combines:
-- a natural description of the improvement
-- concrete examples of relevant KKG solutions
-- a simple explanation of the benefit
+Plain language explains the idea.
 
-Real industry terms are useful when they identify the actual KKG solution.
+KKG terminology makes the recommendation concrete.
 
-Terms such as PDQ, sidekick, endcap, riser, tray, header, shelf talker, rack,
-floorstand, graphic panel, and pallet display should be used when they help show
-what KKG could realistically create.
+Use real terms such as PDQ, sidekick, endcap, riser, tray, header, shelf talker,
+rack, floorstand, graphic panel, and pallet display when they identify a
+physically supported solution.
 
-Do not make the reader choose between plain language and industry language.
-
-Use both when useful.
-
-For example:
-
-"a small branded organizer, such as a tray, compact PDQ, or small rack"
-
-is preferable to:
-
-"a product organizer"
-
-because the first version explains the idea AND gives useful KKG examples.
-
-Likewise:
-
-"a shelf callout, such as a shelf strip, shelf talker, or tray-front graphic"
-
-is preferable to:
-
-"add labels"
-
-when those physical formats are supported.
-
-Plain language should make KKG terminology understandable.
-
-KKG terminology should make the recommendation concrete.
+Do not use those terms merely to sound technical.
 
 OUTPUT WRITING:
 
@@ -1496,33 +876,31 @@ Do not use titles that sound like criterion labels or technical diagnoses.
 
 The evidence field is displayed to the user as "Why".
 
-The Why should usually be ONE short sentence.
-
-The Why should:
-- describe the specific visible condition
-- explain why it matters
-- stay specific to this image
+The Why should usually be ONE short sentence that:
+- describes the specific visible condition
+- explains why it matters
+- stays specific to this image
 
 Use a second sentence only when uncertainty or an important condition truly
 needs to be explained.
 
 Do not repeat the same observation several ways.
 
-The recommendation should usually be ONE short sentence.
+The recommendation should usually be ONE concise sentence.
 
-The recommendation should:
-- begin with the practical improvement in natural language
-- include 1-3 relevant KKG examples when they make the idea more concrete
+For a genuine KKG opportunity, it should:
+- explain the improvement naturally
+- give 2-3 supported KKG implementation examples when multiple closely related
+  options genuinely fit
+- use one KKG format only when it is clearly the sole strong fit
 - explain the practical benefit
 - stay grounded in the visible scene
 
-A recommendation does NOT need three KKG examples every time.
+Do not make the client infer what KKG could build from a generic description.
+Show them.
 
-Use:
-- one example when one solution is clearly strongest
-- two or three examples when several closely related formats are realistic
-- no fabricated-format example when a simple execution correction is all the
-  image supports
+Do not make the recommendation read like a finalized production specification.
+The examples are account-team thought starters.
 
 Prefer direct wording such as:
 - "Use a small branded organizer, such as a tray, compact PDQ, or small rack,
@@ -1530,23 +908,13 @@ Prefer direct wording such as:
 - "Add simple shelf communication, such as a shelf strip, shelf talker, or
   tray-front graphic, to help shoppers compare the options faster."
 - "Make better use of the vertical space with a product riser or tiered tray
-  that brings more of the assortment into view."
+  to bring more of the assortment into view."
 - "Add a raised branded element, such as a header, topper, or communication
   riser, to give the section more visibility."
 - "Carry the campaign into the product area with a physical touchpoint, such
   as a branded tray, shelf graphic, or header."
-- "Strengthen the existing display with graphic panels, side-panel graphics,
-  or replacement inserts so the fixture feels like one coordinated execution."
-- "Give the product a more defined branded home with a compact display, such
-  as a PDQ, branded tray, or small rack."
-- "Make the assortment easier to scan with shelf strips, variant callouts, or
-  tray-front graphics so shoppers can find the right option faster."
-- "Connect the related products with a cross-merchandising element, such as a
-  shared shelf callout, header, or compact display."
-- "Add a simple digital connection, such as a QR callout on a shelf graphic or
-  sign, to extend product education beyond the package."
 
-These are examples of writing style and translation behavior only.
+These are examples of writing behavior only.
 
 Do not reuse these findings or solutions unless the specific image supports them.
 
@@ -1559,15 +927,8 @@ final production decisions have already been made.
 Do not invent finished advertising copy, slogans, taglines, or campaign language
 unless that wording is already visible in the image or supplied by the user.
 
-Recommend the communication need and the physical format instead of writing the
+Recommend the communication need and physical format instead of writing the
 final creative.
-
-For example:
-
-"Add a low header, topper, or raised sign that connects the popcorn and
-seasoning sections"
-
-is better than inventing the actual headline that should appear on the sign.
 
 AVOID JARGON:
 
@@ -1737,33 +1098,24 @@ Be conservative when the image is unclear.
 
 If evidence is weak or partially obscured, lower confidence instead of guessing.
 
-FINAL RECOMMENDATION CHECK:
+FINAL LANGUAGE CHECK:
 
 Before returning the JSON, internally review every recommendation.
 
 For each recommendation, ask:
 
-1. Is the practical idea understandable in plain language?
-
-2. If KKG could realistically deliver a physical or communication solution,
-   did I give 1-3 relevant examples of what that could be?
-
-3. Do those examples belong to the same practical solution family?
-
-4. Are those examples physically supported by the visible scene?
-
-5. Did I explain the shopper, brand, or merchandising benefit?
-
-6. Did I avoid vague wording when useful KKG examples were available?
-
-7. Did I avoid forcing a fabricated solution when a simple execution correction
-   was more appropriate?
-
-8. Did I avoid inventing final creative copy, dimensions, materials, retailer
-   approval, inventory, budget, or unseen placement?
-
-9. Does the recommendation sound like a useful KKG account-team thought starter
-   rather than a technical specification?
+- Can a client immediately understand the idea?
+- If this represents work KKG could produce, did I show what that work could
+  actually be?
+- If several closely related KKG formats plausibly fit, did I give 2-3 useful
+  examples?
+- If I used only one KKG format, is it genuinely the sole strong fit rather
+  than simply the first valid option I thought of?
+- Are all examples physically supported by the visible scene?
+- Is the shopper, brand, or merchandising benefit obvious?
+- Did I avoid turning the recommendation into a catalog?
+- Did I avoid forcing a fabricated solution when a simple execution correction
+  was more appropriate?
 
 If a recommendation says only things such as:
 - add an organizer
@@ -1773,8 +1125,8 @@ If a recommendation says only things such as:
 - improve navigation
 - add a callout
 
-and the image supports concrete KKG examples, revise the recommendation to add
-the relevant examples before returning it.
+and the image supports concrete KKG examples, rewrite the recommendation to
+include the relevant examples before returning it.
 
 Do not output this internal check.
 
