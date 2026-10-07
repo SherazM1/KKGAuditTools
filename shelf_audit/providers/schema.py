@@ -15,9 +15,9 @@ from typing import Any
 from ..opportunity import Opportunity
 
 
-MAX_TITLE_LENGTH = 160
-MAX_EVIDENCE_LENGTH = 1200
-MAX_RECOMMENDATION_LENGTH = 1200
+MAX_TITLE_LENGTH = 100
+MAX_EVIDENCE_LENGTH = 500
+MAX_RECOMMENDATION_LENGTH = 500
 
 
 class ProviderResponseSchemaError(ValueError):

@@ -49,8 +49,8 @@
     "id": "riser_additional_messaging",
     "category": "Messaging",
     "applies_when": "The product is presented on a shelf, tray, rack, or small fixture and unused vertical space is visibly available above the merchandise.",
-    "check": "Would a riser or other raised communication element improve visibility, brand presence, shopper navigation, or product understanding without obstructing the merchandise?",
-    "suggestion": "Consider a riser, low header, or raised branded communication element when the visible fixture geometry and vertical clearance support it.",
+    "check": "Would a low header, raised sign, or communication riser improve brand visibility, navigation, or product understanding without obstructing the merchandise, rather than physically elevating the products?",
+    "suggestion": "Add a low header, raised sign, or communication riser only when visible clearance and a stable supporting fixture allow useful messaging above the products. Use this criterion for raised communication; product risers that lift merchandise belong to product-elevation or tiering opportunities.",
     "priority": 0.85,
     "opportunity_type": "signage",
     "opportunity_scale": "shelf_enhancement",
@@ -86,8 +86,9 @@
       "the scene does not establish usable vertical clearance"
     ],
     "opportunity_formats": [
-      "riser",
       "low_header",
+      "raised_sign",
+      "communication_riser",
       "vertical_signage"
     ]
   },
@@ -136,6 +137,7 @@
     "opportunity_formats": [
       "pdq",
       "tray",
+      "branded_tray",
       "counter_display",
       "shelf_display"
     ]
@@ -145,7 +147,7 @@
     "category": "Placement",
     "applies_when": "The visible package geometry appears stable and repeatable enough to support stacking or tiered presentation.",
     "check": "Could stacking or tiering improve product density, visibility, organization, or use of vertical space without creating instability?",
-    "suggestion": "Consider a stacked, stepped, or tiered presentation when the package geometry, visible clearance, and available merchandising footprint support it.",
+    "suggestion": "Use a supported shelf stack, tiered tray, product riser, or stepped compact display when stable package shapes, visible clearance, and available space support stacking or tiering. Preserve product visibility and shopper access. Consider floor or pallet stacks only when the corresponding placement space and enough product volume are visible.",
     "priority": 0.8,
     "opportunity_type": "display_structure",
     "opportunity_scale": "fixture_enhancement",
@@ -184,6 +186,8 @@
       "stacked_display",
       "shelf_stack",
       "tiered_tray",
+      "product_riser",
+      "stepped_display",
       "floor_stack",
       "pallet_stack"
     ]
@@ -193,7 +197,7 @@
     "category": "Merchandising",
     "applies_when": "The selected product is visibly adjacent to another product category and the relationship is supported by packaging, signage, provided context, or an obvious shared use case.",
     "check": "Could a compact physical merchandising element create a clearer and more intentional connection between the adjacent categories?",
-    "suggestion": "Where the relationship is visually supported, consider a PDQ, tray, shelf-edge element, divider, or small cross-merchandising fixture that connects the categories without disrupting the primary shelf.",
+    "suggestion": "When visible adjacency and a supported product relationship create an opportunity for the selected target, use a branded tray, compact PDQ, small rack, compact cross-merch fixture, or shelf-edge communication to make that connection clearer. Choose only options that fit the visible product sizes, quantity, shelf space, and fixture support without disrupting the primary shelf.",
     "priority": 0.8,
     "opportunity_type": "cross_merchandising",
     "opportunity_scale": "fixture_enhancement",
@@ -231,6 +235,8 @@
     "opportunity_formats": [
       "pdq",
       "tray",
+      "branded_tray",
+      "small_rack",
       "shelf_edge",
       "divider",
       "cross_merch_display"
@@ -241,7 +247,7 @@
     "category": "Branding",
     "applies_when": "Multiple visible brand, product, campaign, promotional, or fixture communication elements appear around the selected product.",
     "check": "Do the visible physical and digital communication elements read as one coordinated branded experience?",
-    "suggestion": "Align messaging, graphics, benefit callouts, fixture treatments, and product presentation so the shopper experiences one clear visual hierarchy and brand story.",
+    "suggestion": "Coordinate the visibly inconsistent elements with a focused graphic or copy refresh, header and callout kit, shelf graphics, or fixture graphics. Update only the elements needed to connect the selected product to a clear brand story; do not replace already effective graphics or unrelated neighboring communication.",
     "priority": 0.85,
     "opportunity_type": "branding",
     "opportunity_scale": "fixture_enhancement",
@@ -575,8 +581,8 @@
     "id": "vertical_space_opportunity",
     "category": "Placement",
     "applies_when": "Meaningful unused height is visibly available within or immediately above the selected product's current merchandising footprint.",
-    "check": "Could the unused height within the current merchandising area support additional product, tiering, stacking, signage, a riser, header, or another appropriately scaled structure?",
-    "suggestion": "Use clearly available vertical capacity within the current merchandising footprint for additional product presentation or branded communication when package geometry, fixture structure, shopper access, and visible clearance support it.",
+    "check": "Could meaningful unused height in the selected product area support stacking, a tiered tray, a product riser, or a rack to improve product presentation, or a raised sign or header to improve communication, with visible clearance and support?",
+    "suggestion": "Use a tiered tray, product riser, stacking arrangement, or appropriately sized rack when visible support, product shape, clearance, and shopper access allow better use of height within the current product area. Use a raised sign or header for a communication need only when mounting support is visible. Ordinary open air above a shelf does not establish usable merchandising space.",
     "priority": 0.85,
     "opportunity_type": "space_utilization",
     "opportunity_scale": "fixture_enhancement",
@@ -614,9 +620,11 @@
     ],
     "opportunity_formats": [
       "stacking",
-      "riser",
-      "header",
+      "tiered_tray",
+      "product_riser",
       "rack",
+      "raised_sign",
+      "header",
       "taller_display"
     ]
   },
@@ -624,8 +632,8 @@
     "id": "dedicated_display_opportunity",
     "category": "Display Structure",
     "applies_when": "The selected product is merchandised on standard retail infrastructure and visible evidence supports moving beyond a modest shelf-level enhancement to a truly dedicated branded merchandising structure.",
-    "check": "Would a dedicated merchandising structure materially improve organization, capacity, visibility, branding, campaign communication, or shopper navigation beyond what a tray, divider, riser, or other modest shelf-level enhancement could reasonably accomplish?",
-    "suggestion": "Recommend the smallest meaningful dedicated display format supported by the visible environment. Use a PDQ or compact dedicated fixture for shelf-level needs; use racks or side-oriented structures only where their placement is supported; and reserve endcap, floorstand, or pallet-scale recommendations for scenes that visibly establish those contexts.",
+    "check": "Does the visible need justify a compact dedicated product destination or larger branded structure beyond what simple facing, a divider, a product riser, or a modest tray could solve, with enough product and visible space for that format?",
+    "suggestion": "Choose the smallest meaningful dedicated structure: a compact PDQ, dedicated rack, or compact branded fixture when visible product size, quantity, assortment, and shelf space justify it. A wire or metal rack is a construction option when the visible support and product needs fit; do not infer permanence. Larger formats require their own visible placement context: side-of-fixture space for a sidekick, appropriate side-facing or end-of-run space for a sidecap, aisle-end evidence for an endcap, floor space for a floorstand, and pallet-scale space with enough visible product volume for a pallet display.",
     "priority": 0.95,
     "opportunity_type": "display_structure",
     "opportunity_scale": "dedicated_display",
@@ -671,6 +679,9 @@
       "pdq",
       "tray",
       "rack",
+      "wire_rack",
+      "metal_rack",
+      "branded_fixture",
       "sidekick",
       "sidecap",
       "endcap",
@@ -684,7 +695,7 @@
     "category": "Display Structure",
     "applies_when": "A sidekick, sidecap, endcap, floorstand, pallet display, rack, or similarly substantial dedicated structure is visibly present.",
     "check": "Are the front, side, header, shelf, and structural surfaces working together effectively for product presentation and communication?",
-    "suggestion": "Use the available display surfaces as a coordinated system for branding, messaging, shopper navigation, product hierarchy, and campaign communication rather than treating each surface independently.",
+    "suggestion": "Improve the existing display with a focused, coordinated graphic or panel kit using supported header, side, front, shelf, or wrap components. Include only the shopper-visible surfaces that need clearer branding, product guidance, or campaign communication; combine related updates into one refresh rather than separate graphics for the same need.",
     "priority": 0.9,
     "opportunity_type": "display_structure",
     "opportunity_scale": "secondary_display",
@@ -720,10 +731,13 @@
       "the display is already fully utilized"
     ],
     "opportunity_formats": [
+      "graphic_kit",
+      "panel_kit",
       "header",
       "side_panel",
       "front_panel",
       "graphic_wrap",
+      "shelf_graphic",
       "shelf_signage",
       "display_refresh"
     ]
@@ -733,7 +747,7 @@
     "category": "Placement",
     "applies_when": "A dedicated display fixture has visible product capacity or merchandising zones.",
     "check": "Is the available display capacity being used intentionally, or does the fixture appear meaningfully underfilled, poorly organized, or structurally mismatched to the merchandise?",
-    "suggestion": "Improve product quantity, facings, shelf configuration, stacking, tray layout, or product flow. If the underfill appears structural rather than temporary, consider resizing or reconfiguring the fixture.",
+    "suggestion": "Improve the existing display through facings, product flow, shelf reconfiguration, a tray insert, or a tiered insert when visible product shapes, support, and clearance fit. Consider resizing or retrofitting the fixture only when the visible mismatch supports a structural issue rather than temporary sell-down. Do not assume additional inventory will be available.",
     "priority": 0.85,
     "opportunity_type": "space_utilization",
     "opportunity_scale": "fixture_enhancement",
@@ -773,7 +787,10 @@
       "shelf_reconfiguration",
       "stacking",
       "product_reflow",
-      "fixture_resize"
+      "tray_insert",
+      "tiered_insert",
+      "fixture_resize",
+      "fixture_retrofit"
     ]
   },
   {
@@ -781,7 +798,7 @@
     "category": "Merchandising",
     "applies_when": "A sidekick, sidecap, endcap, floorstand, pallet display, or other secondary merchandising placement is visibly present.",
     "check": "Does the secondary display create a distinct branded destination and justify its additional retail footprint?",
-    "suggestion": "Strengthen the secondary display through clearer hierarchy, dedicated messaging, better product organization, stronger campaign integration, or a more intentional structural treatment.",
+    "suggestion": "Strengthen the existing secondary display with a focused graphic kit, replacement header or side/front panels, product reconfiguration, or fixture retrofit when these solve a visible branding, campaign, organization, or structural need. Use only supported surfaces and space. If physical graphic damage is the main issue, address it under graphic_condition_refresh rather than repeat the same replacement recommendation here.",
     "priority": 0.9,
     "opportunity_type": "secondary_display",
     "opportunity_scale": "secondary_display",
@@ -878,7 +895,7 @@
     "category": "Shelf Execution",
     "applies_when": "Multiple units or facings of the selected product are visible.",
     "check": "Are the visible units faced, aligned, grouped, and contained in a way that creates a clear and intentional product presentation?",
-    "suggestion": "Improve facing alignment and grouping. If recurring disorder appears related to the fixture rather than simple maintenance, consider a tray, divider, rail, channel, or other product-management structure that helps maintain presentation quality.",
+    "suggestion": "Correct facing and grouping when simple maintenance is enough. If visible containment or fixture problems suggest recurring disorder, consider a branded tray, small rack, wire rack, divider, channel, or rail that fits the products and available support. A compact PDQ may be appropriate when visible quantity, assortment, and shelf space justify it; do not add a fixture for an isolated alignment issue.",
     "priority": 0.75,
     "opportunity_type": "product_presentation",
     "opportunity_scale": "execution",
@@ -917,9 +934,14 @@
     "opportunity_formats": [
       "facing_adjustment",
       "tray",
+      "branded_tray",
       "product_divider",
+      "channel",
       "rail",
-      "rack"
+      "rack",
+      "small_rack",
+      "wire_rack",
+      "pdq"
     ]
   },
   {
@@ -963,6 +985,7 @@
     "opportunity_formats": [
       "signage",
       "tray",
+      "branded_tray",
       "divider",
       "rack",
       "pdq",
@@ -974,7 +997,7 @@
     "category": "Campaign Integration",
     "applies_when": "Digital media, promotional graphics, launch communication, campaign signage, or other strong branded communication appears visibly near the selected product.",
     "check": "Does the physical product presentation reinforce the surrounding campaign strongly enough, or is there a visible gap between the strength of the campaign communication and the merchandise presentation?",
-    "suggestion": "Where supported by the scene, connect the campaign more directly to the merchandise through a branded tray, riser, shelf-edge treatment, header, callout panel, graphic fixture element, or appropriately scaled dedicated display.",
+    "suggestion": "When the visible campaign is clearly associated with the selected target, connect it to the products with a branded tray, compact PDQ, compact branded rack, riser, shelf-edge treatment, header, callout panel, or fixture graphics. Choose only components supported by visible quantity, space, clearance, and fixture support. Use a larger dedicated display only when its scale and placement are established by the scene.",
     "priority": 0.95,
     "opportunity_type": "campaign_integration",
     "opportunity_scale": "fixture_enhancement",
@@ -1013,6 +1036,8 @@
     ],
     "opportunity_formats": [
       "branded_tray",
+      "pdq",
+      "small_rack",
       "riser",
       "shelf_edge",
       "header",
@@ -1026,7 +1051,7 @@
     "category": "Merchandising",
     "applies_when": "Multiple SKUs, variants, sizes, flavors, colors, or product types from the selected assortment are visibly presented together.",
     "check": "Is the assortment organized into a clear visual block with understandable hierarchy, grouping, and navigation?",
-    "suggestion": "Improve assortment blocking using product grouping, dividers, trays, shelf communication, variant callouts, navigation graphics, or a dedicated fixture structure when the visible assortment complexity supports it.",
+    "suggestion": "Start with clearer grouping, shelf navigation, or variant callouts when those are enough to help shoppers find the selected product within its visibly related assortment. Use a branded tray, small rack, compact PDQ, dividers, or branded fixture only when visible assortment complexity, product sizes, quantity, and available space justify a physical component. Do not treat surrounding unrelated products as part of the selected assortment.",
     "priority": 0.9,
     "opportunity_type": "assortment_navigation",
     "opportunity_scale": "fixture_enhancement",
@@ -1062,10 +1087,13 @@
     ],
     "opportunity_formats": [
       "tray",
+      "branded_tray",
       "divider",
       "shelf_navigation",
       "variant_callout",
       "rack",
+      "small_rack",
+      "pdq",
       "branded_fixture"
     ]
   },
@@ -1073,8 +1101,8 @@
     "id": "physical_merchandising_upgrade",
     "category": "Display Structure",
     "applies_when": "The selected product is presented directly on standard retail infrastructure and a modest shelf-level physical component could improve organization, brand ownership, containment, navigation, or presentation quality without requiring a separate secondary placement.",
-    "check": "Would adding a modest shelf-level physical component materially improve the current presentation more than a simple execution correction, without requiring a full dedicated or secondary display?",
-    "suggestion": "Consider a tray, divider, channel, rail, riser, small rack, shelf frame, graphic insert, or other compact branded merchandising component when it solves a visible shelf-level condition. Do not escalate to a larger dedicated or secondary display unless the scene supports that larger scale.",
+    "check": "Would a modest shelf-level component, such as a branded tray, compact PDQ, small rack, or product riser, solve a visible containment, organization, branding, or navigation need better than simple facing or grouping, without requiring a separate secondary placement?",
+    "suggestion": "Use a branded tray, compact PDQ, small rack, divider, channel, rail, product riser, shelf frame, or graphic insert when it solves the selected product's visible shelf-level need and fits the available space and support. A compact PDQ needs compatible product sizes, enough visible quantity or assortment, and a usable shelf footprint; a product riser needs stable support and visible clearance. Wire or metal construction is a rack option, not a separate opportunity. Consider reusable or durable construction only when visible recurring containment or support needs justify it; do not infer permanence, retailer approval, or program duration. Do not escalate to a secondary display without visible placement evidence.",
     "priority": 0.9,
     "opportunity_type": "fixture_enhancement",
     "opportunity_scale": "fixture_enhancement",
@@ -1112,10 +1140,14 @@
     ],
     "opportunity_formats": [
       "branded_tray",
+      "pdq",
       "divider",
       "channel",
-      "riser",
+      "rail",
+      "product_riser",
       "small_rack",
+      "wire_rack",
+      "metal_rack",
       "shelf_frame",
       "graphic_insert"
     ]
@@ -1125,7 +1157,7 @@
     "category": "Messaging",
     "applies_when": "The selected product or assortment presents visible complexity, differentiation, features, variants, usage cues, or purchase decisions that could reasonably benefit from clearer shopper-facing explanation.",
     "check": "Could clearer physical communication help shoppers understand product benefits, differences, usage, features, or which option is right for them?",
-    "suggestion": "When the visible product complexity supports it, use benefit callouts, comparison graphics, instructional messaging, navigation, shelf communication, or fixture graphics to make the product easier to understand and shop.",
+    "suggestion": "When visible product complexity or differences create a shopper decision need, use benefit, comparison, or instructional copy on a shelf talker, comparison panel, instruction panel, navigation graphic, or fixture graphic. Explain only distinctions or usage information supported by readable packaging, signage, or supplied context; do not invent claims or add generic education where the existing presentation is already clear.",
     "priority": 0.85,
     "opportunity_type": "shopper_education",
     "opportunity_scale": "shelf_enhancement",

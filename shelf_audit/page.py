@@ -634,7 +634,7 @@ def render():
 
             st.divider()
 
-            st.subheader("Top Opportunities")
+            st.subheader("Shelf Opportunities")
 
             if not result.opportunities:
 
@@ -662,18 +662,12 @@ def render():
                         f"{opportunity.recommendation}"
                     )
 
-                    st.caption(
-                        "Priority score: "
-                        f"{opportunity.priority_score:.2f}"
-                    )
-
                     st.write("")
 
 
             st.divider()
 
             st.caption(
-                f"{result.criteria_evaluated} criteria available · "
                 f"{mode_config.label} · "
                 f"{depth_config.label}"
             )
