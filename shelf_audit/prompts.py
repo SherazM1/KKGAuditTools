@@ -13,7 +13,7 @@ from .audit_modes import get_mode_config, get_depth_config
 from .models import AuditMode, AuditDepth, TargetRegion
 
 
-PROMPT_VERSION = "v8"
+PROMPT_VERSION = "v9"
 
 
 def _compact_criteria(
@@ -336,6 +336,48 @@ These are solution families, not a checklist.
 Only use formats supported by the specific image.
 
 Do not turn a recommendation into a catalog of everything KKG could make.
+
+KKG SOLUTION LANGUAGE:
+
+Describe the solution in everyday language, identify the relevant KKG format by
+name, and explain what it accomplishes.
+
+Plain language should explain the industry term, not replace it.
+
+When a recognizable KKG format fits, pair a clear plain-language description
+with the actual solution family when that helps the reader understand both the
+idea and what KKG could realistically create.
+
+Examples of this phrasing include:
+- a small branded product tray, such as a compact PDQ
+- a shelf callout, such as a shelf talker or shelf strip
+- a small dedicated rack, including a wire or metal rack where appropriate
+- a product riser to lift or tier the merchandise
+- a raised branded sign, such as a header or topper
+- a secondary display, such as a sidekick or sidecap, when the visible placement supports it
+- a large floor display, such as a quarter-pallet, half-pallet, or full-pallet display, when the visible scale and placement support it
+
+Do not force the industry term when the image does not support that format.
+
+If several closely related KKG formats could solve the same visible need,
+name 2-3 useful options within the same solution family.
+
+For example:
+- "Use a small branded organizer, such as a tray, compact PDQ, or small rack,
+  to keep the products together and give the section more presence."
+- "Add a shelf callout, such as a shelf talker, shelf strip, or small graphic,
+  to make the choices easier to understand."
+- "Use a raised branded element, such as a header or topper, to connect the
+  product area to nearby campaign or category messaging."
+
+Do not replace useful KKG format names with only vague descriptions such as
+"organizer", "holder", "sign", "display element", or "structure" when a supported
+recognized format can be named.
+
+At the same time, do not make the wording depend on industry jargon alone.
+
+The recommendation should remain understandable even if the reader does not
+already know the industry term.
 
 EXECUTION FIX VS. KKG OPPORTUNITY:
 
@@ -805,10 +847,20 @@ Do not write like:
 
 Do not make the writing sound more sophisticated than it needs to be.
 
-Real industry terms are appropriate when they name the actual solution.
+Real industry terms are important when they identify the actual KKG solution.
 
 Terms such as PDQ, sidekick, endcap, riser, tray, header, shelf talker, rack,
-and pallet display are welcome when they are the correct solution.
+and pallet display should be preserved when they correctly identify a supported
+solution family.
+
+Do not remove a useful industry term merely to make the sentence sound simpler.
+
+Instead, explain it with ordinary language around it.
+
+For example, "a small branded product tray, such as a compact PDQ" is preferable
+to either "a product organizer" alone or "a PDQ" with no explanation.
+
+Plain language should explain the KKG term, not erase it.
 
 When an industry term may not be familiar to every reader, make the rest of
 the sentence clear enough that the recommendation still makes sense.
@@ -853,16 +905,18 @@ Use a second sentence only when an important condition or uncertainty must be
 preserved.
 
 Prefer direct wording such as:
-- "Use a branded tray, compact PDQ, or small rack to keep the products organized
-  and give the section more presence."
-- "Use shelf strips, small callout graphics, or simple variant messaging to help
-  shoppers tell the sizes and versions apart."
-- "Carry the campaign into the product area with a branded tray, compact riser,
-  or shelf graphic."
-- "Use a product riser, tiered tray, or stepped compact display to lift the back
-  row and make more of the assortment visible."
-- "Refresh the header and side graphics so the display feels like one coordinated
-  brand execution."
+- "Use a small branded organizer, such as a tray, compact PDQ, or small rack,
+  to keep the products organized and give the section more presence."
+- "Add a shelf callout, such as a shelf talker, shelf strip, or small graphic,
+  to help shoppers tell the sizes and versions apart."
+- "Carry the campaign into the product area with a small branded display element,
+  such as a tray, compact PDQ, or shelf graphic."
+- "Use a product riser or tiered tray to lift the back row and make more of the
+  assortment visible."
+- "Use a raised branded element, such as a header or topper, to strengthen the
+  connection between the product area and nearby messaging."
+- "Refresh the header and side-panel graphics so the display feels like one
+  coordinated brand execution."
 
 These are examples of writing style only.
 
@@ -873,6 +927,15 @@ Recommendations should feel like useful KKG thought starters.
 They should show the client what KKG could realistically design, produce,
 print, fabricate, kit, assemble, install, or support without implying that
 final production decisions have already been made.
+
+Do not invent finished advertising copy, slogans, taglines, or campaign language
+unless that wording is already visible in the image or supplied by the user.
+
+Recommend the communication need and the physical format instead of writing the
+final creative.
+
+For example, "Add a header or raised sign that connects the popcorn and seasoning
+sections" is better than inventing a headline for that sign.
 
 AVOID JARGON:
 
