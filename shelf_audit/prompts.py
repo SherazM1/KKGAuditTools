@@ -13,7 +13,7 @@ from .audit_modes import get_mode_config, get_depth_config
 from .models import AuditMode, AuditDepth, TargetRegion
 
 
-PROMPT_VERSION = "v7"
+PROMPT_VERSION = "v8"
 
 
 def _compact_criteria(
@@ -166,11 +166,17 @@ def _build_depth_instructions(
         return """
 AUDIT DEPTH: QUICK
 
-Focus only on the clearest, strongest, most actionable opportunities.
+Focus on the clearest, strongest, most actionable opportunities.
 
-Do not spend output on marginal observations or weak possibilities.
+Continue scanning the scene for additional distinct opportunities that are
+clearly supported.
 
-Prefer fewer high-confidence findings over broader coverage.
+Quick means concise and selective, not limited to only one or two findings.
+
+Return multiple findings when they address genuinely different visible needs.
+
+Do not spend output on marginal observations, filler, or several versions of
+the same idea.
 """.strip()
 
     if depth is AuditDepth.DEEP:
@@ -278,6 +284,7 @@ For every opportunity, reason through this sequence:
 4. State the practical benefit in simple language.
 
 The final recommendation should answer:
+
 "What could KKG realistically do about what we are seeing?"
 
 Do not stop at abstract advice such as:
@@ -443,15 +450,33 @@ solutions that fit:
 
 Do not output this internal comparison.
 
-When one solution clearly fits best, recommend that solution.
+When one solution is clearly the only strong fit, recommend that solution.
 
-When several solutions are genuinely realistic and useful, usually offer
-2-3 best-fit options within ONE recommendation.
+When several KKG solutions solve the same visible need in a similar and
+physically plausible way, prefer a short family of 2-3 useful options.
+
+Examples of useful solution families may include:
+- branded tray / compact PDQ / small rack
+- shelf strip / shelf talker / small callout graphic
+- product riser / tiered tray / stepped compact display
+- header / topper / raised sign
+- graphic panel / shelf graphic / side-panel graphic
+
+Group options only when they address the same practical need and all are
+supported by the visible scene.
+
+This should feel like an account-team thought starter, not a final production
+specification.
+
+Give enough direction to show what KKG could create without pretending the
+final format, dimensions, materials, or engineering have already been decided.
+
+Do not list unrelated formats together.
 
 Do not list alternatives simply to appear comprehensive.
 
-Four options should be uncommon and used only when the alternatives are
-genuinely different and useful.
+Usually keep the family to 2-3 options. Use four only when the image genuinely
+supports four useful variations.
 
 Each option must independently satisfy the physical-fit and placement rules.
 
@@ -461,6 +486,7 @@ placement exists.
 GENERAL OPPORTUNITY SCALE:
 
 1. EXECUTION
+
 Examples:
 - facing
 - alignment
@@ -469,6 +495,7 @@ Examples:
 - organization
 
 2. SHELF ENHANCEMENT
+
 Examples:
 - shelf strips
 - shelf talkers
@@ -479,6 +506,7 @@ Examples:
 - compact communication elements
 
 3. FIXTURE ENHANCEMENT
+
 Examples:
 - branded trays
 - dividers
@@ -492,6 +520,7 @@ Examples:
 - fixture graphics
 
 4. DEDICATED DISPLAY
+
 Examples:
 - PDQs
 - dedicated shelf displays
@@ -500,6 +529,7 @@ Examples:
 - other dedicated product structures
 
 5. SECONDARY DISPLAY
+
 Examples:
 - sidekicks
 - sidecaps
@@ -507,6 +537,7 @@ Examples:
 - floorstands
 
 6. LARGE FORMAT
+
 Examples:
 - quarter-pallet displays
 - half-pallet displays
@@ -824,15 +855,24 @@ preserved.
 Prefer direct wording such as:
 - "Use a branded tray, compact PDQ, or small rack to keep the products organized
   and give the section more presence."
-- "Add simple shelf graphics that help shoppers tell the sizes and versions apart."
-- "Carry the campaign into the product area with a branded tray or shelf graphic."
-- "Use a product riser to lift the back row and make more of the assortment visible."
+- "Use shelf strips, small callout graphics, or simple variant messaging to help
+  shoppers tell the sizes and versions apart."
+- "Carry the campaign into the product area with a branded tray, compact riser,
+  or shelf graphic."
+- "Use a product riser, tiered tray, or stepped compact display to lift the back
+  row and make more of the assortment visible."
 - "Refresh the header and side graphics so the display feels like one coordinated
   brand execution."
 
 These are examples of writing style only.
 
 Do not reuse these findings or solutions unless the specific image supports them.
+
+Recommendations should feel like useful KKG thought starters.
+
+They should show the client what KKG could realistically design, produce,
+print, fabricate, kit, assemble, install, or support without implying that
+final production decisions have already been made.
 
 AVOID JARGON:
 
@@ -870,6 +910,39 @@ Prefer plain alternatives such as:
 
 Do not add unnecessary fixture-engineering detail.
 
+OPPORTUNITY COVERAGE:
+
+Do not stop after finding one or two good opportunities.
+
+After identifying the most obvious issue, continue looking for other distinct
+ways KKG could improve the selected product area.
+
+A single image may support several different opportunities, such as:
+- product organization
+- shopper navigation or education
+- signage or messaging
+- stronger branding
+- campaign-to-shelf integration
+- shelf or fixture improvement
+- cross-merchandising
+- dedicated merchandising
+- secondary placement
+
+Return additional findings when each one:
+- has its own visible evidence
+- solves a meaningfully different need
+- leads to a distinct KKG action or deliverable
+- is physically supported by the scene
+
+Two findings are correct when only two are strong.
+
+Three, four, or more findings are correct when the image genuinely supports
+that many different opportunities.
+
+Do not create extra findings merely to increase the count.
+
+Do not split one visible problem into several nearly identical opportunities.
+
 RECOMMENDATION VARIETY:
 
 Return meaningfully different opportunities, not several versions of the same
@@ -899,8 +972,8 @@ For each opportunity you return:
 
 2. Explain the specific visible evidence that makes the opportunity relevant.
 
-3. Give one concrete recommendation, with a few supported alternatives only
-   when those alternatives genuinely help the reader.
+3. Give one concrete recommendation, with a short family of 2-3 closely related
+   supported options when those alternatives genuinely help the reader.
 
 4. Score each opportunity from 0.0 to 1.0:
 
@@ -982,6 +1055,9 @@ There is no minimum result count.
 Two strong opportunities are better than four weak ones, but do not arbitrarily
 stop at two when additional distinct, high-confidence opportunities are clearly
 supported.
+
+Three, four, or more findings are appropriate when the scene genuinely supports
+that many different opportunities.
 
 Do not force four findings or fill either limit with weak or overlapping ideas.
 
