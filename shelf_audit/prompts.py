@@ -13,7 +13,7 @@ from .audit_modes import get_mode_config, get_depth_config
 from .models import AuditMode, AuditDepth, TargetRegion
 
 
-PROMPT_VERSION = "v11"
+PROMPT_VERSION = "v12"
 
 
 def _compact_criteria(
@@ -338,6 +338,43 @@ INCOMPLETE:
 BETTER:
 "Strengthen the connection with a low branded communication element, such as
 a header, topper, or communication riser."
+
+GENERIC PHYSICAL LANGUAGE IS NOT THE FINAL ANSWER:
+
+Descriptions such as:
+- callout panel
+- navigation panel
+- raised sign
+- shelf-mounted sign
+- organizer
+- holder
+- display element
+- fixture element
+- branded structure
+
+may describe the FUNCTION of an idea, but they should not replace recognizable
+KKG formats when supported KKG formats exist.
+
+Translate the function into real KKG examples.
+
+For example:
+
+Instead of:
+"Add a shelf-mounted callout panel."
+
+Prefer:
+"Add simple shelf communication, such as a shelf talker, shelf strip, or low
+header."
+
+Instead of:
+"Add a raised navigation panel."
+
+Prefer:
+"Use shelf strips, shelf talkers, or tray-front graphics to make the assortment
+easier to scan."
+
+A generic description may introduce the idea, but the final recommendation
+should show what KKG could actually make.
 
 If one KKG format is clearly the only strong fit, one format is enough.
 
@@ -859,6 +896,32 @@ physically supported solution.
 
 Do not use those terms merely to sound technical.
 
+KEEP THE LANGUAGE PLAIN AND SHORT:
+
+Write like someone speaking to a client in the aisle, not presenting a strategy
+deck.
+
+Do not over-explain obvious benefits.
+
+If the point can be said clearly in fewer words, use fewer words.
+
+Prefer:
+- keep the bottles organized
+- make the section easier to shop
+- help shoppers find flavors faster
+- connect the seasonings with the popcorn above
+- give the brand more presence
+
+Avoid polished phrases such as:
+- create an intentional pairing
+- create a more cohesive execution
+- strengthen shopper-facing communication
+- enhance the branded experience
+- improve assortment navigation
+- create a more elevated presentation
+
+Use the simplest accurate wording.
+
 OUTPUT WRITING:
 
 Keep titles short, natural, and action-oriented.
@@ -886,33 +949,62 @@ needs to be explained.
 
 Do not repeat the same observation several ways.
 
-The recommendation should usually be ONE concise sentence.
+The recommendation should usually be ONE short sentence.
+
+Aim for about 12-24 words when the idea can be expressed clearly in that space.
 
 For a genuine KKG opportunity, it should:
-- explain the improvement naturally
-- give 2-3 supported KKG implementation examples when multiple closely related
-  options genuinely fit
+- state the improvement naturally
+- give 1-3 recognizable KKG examples when useful
 - use one KKG format only when it is clearly the sole strong fit
-- explain the practical benefit
+- state the benefit only when it adds useful information
 - stay grounded in the visible scene
 
+Do not explain the recommendation twice.
+
+Do not add a polished closing phrase merely to make the sentence sound complete.
+
 Do not make the client infer what KKG could build from a generic description.
+
 Show them.
 
 Do not make the recommendation read like a finalized production specification.
+
 The examples are account-team thought starters.
 
 Prefer direct wording such as:
-- "Use a small branded organizer, such as a tray, compact PDQ, or small rack,
-  to keep the products organized and give the section more presence."
-- "Add simple shelf communication, such as a shelf strip, shelf talker, or
-  tray-front graphic, to help shoppers compare the options faster."
-- "Make better use of the vertical space with a product riser or tiered tray
-  to bring more of the assortment into view."
-- "Add a raised branded element, such as a header, topper, or communication
-  riser, to give the section more visibility."
-- "Carry the campaign into the product area with a physical touchpoint, such
-  as a branded tray, shelf graphic, or header."
+
+- "Use shallow branded trays, a compact PDQ, or shelf channels to keep the
+  seasoning bottles upright and organized."
+
+- "Add a shelf talker, low header, or communication riser to connect the
+  seasonings with the popcorn above."
+
+- "Use shelf strips, shelf talkers, or tray-front graphics to make the flavors
+  easier to find."
+
+- "Use a product riser or tiered tray to bring more of the assortment into view."
+
+- "Carry the campaign onto the shelf with a branded tray, shelf graphic, or
+  header."
+
+Prefer:
+"Use shallow branded trays, a compact PDQ, or shelf channels to keep the
+seasoning bottles upright and organized."
+
+Over:
+"Use shallow branded trays or shelf channels sized to the bottles to keep each
+row upright and easy to pull forward, giving the seasoning section a cleaner
+presentation."
+
+Prefer:
+"Add a shelf talker, low header, or communication riser to connect the
+seasonings with the popcorn above."
+
+Over:
+"Add a compact shelf-mounted callout panel or low raised sign above the
+seasonings to highlight their use with popcorn, making the adjacent products
+feel like an intentional pairing."
 
 These are examples of writing behavior only.
 
@@ -1116,6 +1208,10 @@ For each recommendation, ask:
 - Did I avoid turning the recommendation into a catalog?
 - Did I avoid forcing a fabricated solution when a simple execution correction
   was more appropriate?
+- Am I using a generic physical description where a recognizable KKG format
+  would be clearer?
+- Did I add words that sound strategic or polished without adding information?
+- Can I say the same recommendation more simply?
 
 If a recommendation says only things such as:
 - add an organizer
