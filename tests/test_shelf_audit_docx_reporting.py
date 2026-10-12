@@ -7,12 +7,14 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from unittest.mock import Mock, patch
 from zipfile import ZipFile
 from zoneinfo import ZoneInfo
 
 from docx import Document
+from docx.text.paragraph import Paragraph
 from docx.oxml.ns import qn
 from PIL import Image
 from streamlit.testing.v1 import AppTest
@@ -20,7 +22,8 @@ from streamlit.testing.v1 import AppTest
 from shelf_audit.reporting import ReportMetadata, build_report
 from shelf_audit.reporting.docx_renderer import (
     LAYOUT_PRESETS, MIN_BODY_FONT_SIZE, PHOTO_MAX_WIDTH, PHOTO_MAX_HEIGHT,
-    estimate_report_height, render_docx, select_layout,
+    estimate_report_height, render_docx, select_layout, first_opportunity_fits,
+    photo_box_width, TOP_LEFT_FRACTION,
 )
 from shelf_audit.reporting.formatting import DEFAULT_LOGO_PATH
 from shelf_audit.reporting.formatting import BLUE
@@ -36,11 +39,15 @@ def photo_bytes(size=(600, 300), color="red", image_format="PNG"):
 
 def docx_text(data):
     doc = Document(BytesIO(data))
-    paragraphs = list(doc.paragraphs)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                paragraphs.extend(cell.paragraphs)
+    paragraphs = []
+    # Preserve visible body order when the first finding is inside a table.
+    for block in doc.iter_inner_content():
+        if isinstance(block, Paragraph):
+            paragraphs.append(block)
+        else:
+            for row in block.rows:
+                for cell in row.cells:
+                    paragraphs.extend(cell.paragraphs)
     for section in doc.sections:
         paragraphs.extend(section.header.paragraphs)
         paragraphs.extend(section.footer.paragraphs)
@@ -57,6 +64,90 @@ def media_bytes(data):
 
 
 class ShelfAuditDocxTests(unittest.TestCase):
+    def test_short_first_finding_is_complete_in_borderless_top_table(self):
+        for count in (1, 2, 3):
+            with self.subTest(count=count):
+                report = build_report(completed_result(count), audit_photo=photo_bytes((300, 900)))
+                layout = select_layout(report)
+                self.assertTrue(first_opportunity_fits(report, layout))
+                doc = Document(BytesIO(render_docx(report)))
+                table = doc.tables[0]
+                left_text = "\n".join(p.text for p in table.cell(0, 0).paragraphs)
+                body_text = "\n".join(p.text for p in doc.paragraphs)
+                first = report.opportunities[0]
+                for value in (first.title, first.evidence, first.recommendation):
+                    self.assertIn(value, left_text)
+                    self.assertNotIn(value, body_text)
+                for item in report.opportunities[1:]:
+                    for value in (item.title, item.evidence, item.recommendation):
+                        self.assertIn(value, body_text)
+                        self.assertNotIn(value, left_text)
+                # Word stores widths in whole twips, so allow sub-twip rounding.
+                self.assertAlmostEqual(table.columns[0].width / sum(c.width for c in table.columns), 0.60, places=4)
+                self.assertEqual(TOP_LEFT_FRACTION, 0.60)
+                borders = table._tbl.tblPr.find(qn("w:tblBorders"))
+                self.assertEqual(len(borders), 6)
+                self.assertTrue(all(border.get(qn("w:val")) == "nil" for border in borders))
+                self.assertTrue(table.rows[0]._tr.xpath("w:trPr/w:cantSplit"))
+                paragraphs = table.cell(0, 0).paragraphs
+                heading = next(p for p in paragraphs if p.text.startswith("01  "))
+                self.assertTrue(all(run.font.name == "Gotham-Bold" for run in heading.runs))
+                for label in ("WHY", "RECOMMENDATION"):
+                    self.assertEqual(next(p for p in paragraphs if p.text == label).runs[0].font.name, "Gotham-Medium")
+                for value in (first.evidence, first.recommendation):
+                    self.assertEqual(next(p for p in paragraphs if p.text == value).runs[0].font.name, "Gotham-Book")
+
+    def test_long_first_finding_and_long_metadata_choose_full_width(self):
+        for long_metadata in (False, True):
+            with self.subTest(long_metadata=long_metadata):
+                result = completed_result(2)
+                metadata = None
+                if long_metadata:
+                    metadata = ReportMetadata(client="Long synthetic metadata " * 30)
+                else:
+                    result.opportunities[0].evidence = "Long synthetic evidence " * 30
+                report = build_report(result, metadata=metadata, audit_photo=photo_bytes())
+                self.assertFalse(first_opportunity_fits(report, select_layout(report)))
+                doc = Document(BytesIO(render_docx(report)))
+                self.assertEqual(len(doc.tables[0].cell(0, 0).paragraphs), 3)
+                body = "\n".join(p.text for p in doc.paragraphs)
+                for item in report.opportunities:
+                    for value in (item.title, item.evidence, item.recommendation):
+                        self.assertIn(value, body)
+
+    def test_missing_photo_has_single_column_metadata_and_full_width_findings(self):
+        for photo in (None, b"invalid photo"):
+            with self.subTest(photo=photo):
+                report = build_report(completed_result(1), audit_photo=photo)
+                self.assertFalse(first_opportunity_fits(report, select_layout(report)))
+                doc = Document(BytesIO(render_docx(report)))
+                self.assertEqual(len(doc.tables), 0)
+                self.assertEqual([p.text for p in doc.paragraphs[:3]], ["Client: ", "Retailer: ", "Location: "])
+                body = "\n".join(p.text for p in doc.paragraphs)
+                self.assertIn(report.opportunities[0].evidence, body)
+                self.assertIn(report.opportunities[0].recommendation, body)
+
+    def test_short_two_and_three_finding_estimates_improve_on_previous_layout(self):
+        for count in (2, 3):
+            with self.subTest(count=count):
+                report = build_report(completed_result(count), audit_photo=photo_bytes())
+                layout = select_layout(report)
+                width = (8.5 - 2 * layout.margin) * 72
+
+                def previous_lines(text, font_size):
+                    characters = max(1, int(width / (font_size * 0.55)))
+                    return sum(max(1, len(textwrap.wrap(line, width=characters))) for line in text.split("\n"))
+
+                # Previous renderer reserved the full photo row, then rendered
+                # every finding below it at full width (blank metadata fixture).
+                previous_height = 2.1 * 72 + 6 + 12 + 78
+                for item in report.opportunities:
+                    previous_height += previous_lines(f"{item.number:02d}  {item.title}", layout.title_size) * layout.title_size * 1.12
+                    previous_height += 22 + layout.section_spacing + 12
+                    previous_height += sum(previous_lines(value, layout.body_size) * layout.body_size * 1.12 for value in (item.evidence, item.recommendation))
+                self.assertLess(estimate_report_height(report, layout), previous_height)
+                self.assertGreaterEqual(layout.body_size, 10)
+
     def test_gotham_faces_in_expected_roles_and_no_embedded_fonts(self):
         result = completed_result(1)
         report = build_report(result, metadata=ReportMetadata(
@@ -76,7 +167,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
         self.assertEqual(subtitle.text, "ACTIONABLE MERCHANDISING RECOMMENDATIONS")
         assert_font(subtitle.runs[0], "Gotham-Medium")
         self.assertEqual(str(subtitle.runs[0].font.color.rgb), BLUE.lstrip("#"))
-        for paragraph in doc.tables[0].cell(0, 0).paragraphs:
+        for paragraph in doc.paragraphs[:3]:
             assert_font(paragraph.runs[0], "Gotham-Medium")
             assert_font(paragraph.runs[1], "Gotham-Book")
         heading = next(p for p in doc.paragraphs if p.text.startswith("01  "))
@@ -182,8 +273,9 @@ class ShelfAuditDocxTests(unittest.TestCase):
                 self.assertLessEqual(shape.width.inches, PHOTO_MAX_WIDTH + 0.00001)
                 self.assertLessEqual(shape.height.inches, PHOTO_MAX_HEIGHT + 0.00001)
                 previous_scale = min(3.15 / size[0], 1.4 / size[1])
-                self.assertGreaterEqual(shape.width.inches, size[0] * previous_scale * 1.49)
-                self.assertGreaterEqual(shape.height.inches, size[1] * previous_scale * 1.49)
+                self.assertLessEqual(shape.width.inches, photo_box_width(select_layout(report)) + 0.00001)
+                if size[1] > size[0]:
+                    self.assertGreaterEqual(shape.height.inches, size[1] * previous_scale * 1.49)
 
     def test_missing_invalid_photo_and_missing_logo_degrade_gracefully(self):
         with tempfile.TemporaryDirectory() as directory:
