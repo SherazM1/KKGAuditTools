@@ -21,12 +21,14 @@ def build_report(
     title: str = DEFAULT_REPORT_TITLE,
     subtitle: str | None = DEFAULT_REPORT_SUBTITLE,
     footer_text: str = DEFAULT_FOOTER_TEXT,
+    audit_photo: bytes | None = None,
 ) -> ShelfOpportunityReport:
     """Copy final findings verbatim in order, numbered starting at one.
 
     Image references are opaque paths/identifiers keyed by the one-based report
     number. They are not loaded or generated here. Missing entries remain None.
     The input audit and its opportunities are never retained or mutated.
+    Optional original upload bytes are carried unchanged, without image analysis.
     """
     opportunities = tuple(
         ReportOpportunity(
@@ -48,4 +50,5 @@ def build_report(
         title=title,
         subtitle=subtitle,
         footer_text=footer_text,
+        audit_photo=audit_photo,
     )

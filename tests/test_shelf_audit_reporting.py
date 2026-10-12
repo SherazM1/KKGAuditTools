@@ -96,7 +96,7 @@ class ShelfAuditReportingTests(unittest.TestCase):
         report = build_report(completed_result(2))
         payload = asdict(report)
         self.assertEqual(set(payload), {
-            "metadata", "opportunities", "title", "subtitle", "footer_text",
+            "metadata", "opportunities", "title", "subtitle", "footer_text", "audit_photo",
         })
         self.assertEqual(set(payload["metadata"]), {
             "client", "brand", "retailer", "location", "audit_date",

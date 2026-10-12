@@ -48,3 +48,4 @@ class ShelfOpportunityReport:
     title: str = DEFAULT_REPORT_TITLE
     subtitle: str | None = DEFAULT_REPORT_SUBTITLE
     footer_text: str = DEFAULT_FOOTER_TEXT
+    audit_photo: bytes | None = None

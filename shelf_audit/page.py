@@ -548,6 +548,7 @@ def render():
 
             st.session_state.pop("shelf_audit_completed_result", None)
             st.session_state.pop("shelf_audit_report_document", None)
+            st.session_state.pop("shelf_audit_completed_photo", None)
 
             try:
 
@@ -633,6 +634,9 @@ def render():
 
 
             st.session_state["shelf_audit_completed_result"] = result
+            # Retain the exact upload/camera bytes, not the processed audit image
+            # or Expanded-mode crop. Associate them only with this successful run.
+            st.session_state["shelf_audit_completed_photo"] = image_bytes
 
     # Persist successful final results across report form/download reruns.
     result = st.session_state.get("shelf_audit_completed_result")
@@ -652,4 +656,6 @@ def render():
             f"{get_mode_config(result.mode).label} · "
             f"{get_depth_config(result.depth).label}"
         )
-        render_report_section(result)
+        render_report_section(
+            result, audit_photo=st.session_state.get("shelf_audit_completed_photo")
+        )

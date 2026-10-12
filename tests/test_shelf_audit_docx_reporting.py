@@ -1,0 +1,299 @@
+"""Editable report content, original-photo handling, and provider-free UI tests."""
+
+from dataclasses import asdict
+from datetime import date
+from io import BytesIO
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest.mock import Mock, patch
+from zipfile import ZipFile
+
+from docx import Document
+from PIL import Image
+from streamlit.testing.v1 import AppTest
+
+from shelf_audit.reporting import ReportMetadata, build_report
+from shelf_audit.reporting.docx_renderer import (
+    LAYOUT_PRESETS, MIN_BODY_FONT_SIZE, PHOTO_MAX_WIDTH, PHOTO_MAX_HEIGHT,
+    estimate_report_height, render_docx, select_layout,
+)
+from shelf_audit.reporting.formatting import DEFAULT_LOGO_PATH
+from shelf_audit.reporting.templates import NO_OPPORTUNITIES_TEXT
+from test_shelf_audit_reporting import completed_result
+
+
+def photo_bytes(size=(600, 300), color="red", image_format="PNG"):
+    output = BytesIO()
+    Image.new("RGB", size, color).save(output, format=image_format)
+    return output.getvalue()
+
+
+def docx_text(data):
+    doc = Document(BytesIO(data))
+    paragraphs = list(doc.paragraphs)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                paragraphs.extend(cell.paragraphs)
+    for section in doc.sections:
+        paragraphs.extend(section.header.paragraphs)
+        paragraphs.extend(section.footer.paragraphs)
+        for table in section.header.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    paragraphs.extend(cell.paragraphs)
+    return "\n".join(p.text for p in paragraphs)
+
+
+def media_bytes(data):
+    with ZipFile(BytesIO(data)) as package:
+        return [package.read(name) for name in package.namelist() if name.startswith("word/media/")]
+
+
+class ShelfAuditDocxTests(unittest.TestCase):
+    def test_counts_order_verbatim_content_and_immutable_inputs(self):
+        for count in (0, 1, 2, 3, 4, 8):
+            with self.subTest(count=count):
+                result = completed_result(count)
+                report = build_report(result, audit_photo=photo_bytes())
+                before_result, before_report = asdict(result), asdict(report)
+                data = render_docx(report)
+                text = docx_text(data)
+                positions = []
+                for item in report.opportunities:
+                    positions.append(text.index(item.title))
+                    for value in (item.title, item.evidence, item.recommendation):
+                        self.assertIn(value, text)
+                self.assertEqual(positions, sorted(positions))
+                for hidden in (
+                    "criterion_id", "confidence", "relevance", "impact", "actionability",
+                    "priority_score", "provider", "prompt_version", "internal-",
+                ):
+                    self.assertNotIn(hidden, text)
+                self.assertEqual(asdict(result), before_result)
+                self.assertEqual(asdict(report), before_report)
+                self.assertIn(report.footer_text, text)
+                self.assertIn(report.title, text)
+                self.assertIn(report.subtitle, text)
+                for label in ("Approved By", "Signature", "Date"):
+                    self.assertIn(f"{label}:  ______________________________", text)
+                if count == 0:
+                    self.assertIn(NO_OPPORTUNITIES_TEXT, text)
+
+    def test_only_three_metadata_fields_rendered_even_if_others_supplied(self):
+        metadata = ReportMetadata(
+            client="Test Client", retailer="Test Retailer", location="Test Location",
+            brand="Hidden Brand", audit_date=date(2026, 10, 12),
+            account_lead="Hidden Lead", audit_reference="Hidden Audit",
+            photo_reference="Hidden Photo", signature="Hidden Signature",
+            signature_date=date(2026, 10, 13),
+        )
+        text = docx_text(render_docx(build_report(completed_result(1), metadata=metadata)))
+        for value in (metadata.client, metadata.retailer, metadata.location):
+            self.assertIn(value, text)
+        for value in ("Hidden", "2026-10-12", "2026-10-13", "Account Lead", "Audit Date"):
+            self.assertNotIn(value, text)
+        blank = docx_text(render_docx(build_report(completed_result(0))))
+        for label in ("Client:", "Retailer:", "Location:"):
+            self.assertIn(label, blank)
+        self.assertNotIn("None", blank)
+
+    def test_literal_markup_unicode_and_whitespace_are_preserved(self):
+        result = completed_result(1)
+        result.opportunities[0].title = "  <b>Test title</b>  "
+        result.opportunities[0].evidence = "Café — shopper’s view\nSecond line <script>literal</script>"
+        result.opportunities[0].recommendation = "Keep 100% of text ©.\tNext step."
+        report = build_report(result)
+        text = docx_text(render_docx(report))
+        for item in report.opportunities:
+            for value in (item.title, item.evidence, item.recommendation):
+                self.assertIn(value, text)
+
+    def test_original_photo_bytes_and_bounded_aspect_ratio(self):
+        for size, image_format in (((900, 300), "PNG"), ((300, 900), "PNG"), ((400, 300), "JPEG")):
+            with self.subTest(size=size, image_format=image_format):
+                photo = photo_bytes(size, image_format=image_format)
+                report = build_report(completed_result(2), audit_photo=photo)
+                self.assertIs(report.audit_photo, photo)
+                data = render_docx(report)
+                self.assertIn(photo, media_bytes(data))
+                self.assertIn(DEFAULT_LOGO_PATH.read_bytes(), media_bytes(data))
+                shapes = Document(BytesIO(data)).inline_shapes
+                self.assertEqual(len(shapes), 1)
+                shape = shapes[0]
+                self.assertAlmostEqual(shape.width / shape.height, size[0] / size[1], places=5)
+                self.assertLessEqual(shape.width.inches, PHOTO_MAX_WIDTH + 0.00001)
+                self.assertLessEqual(shape.height.inches, PHOTO_MAX_HEIGHT + 0.00001)
+
+    def test_missing_invalid_photo_and_missing_logo_degrade_gracefully(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for photo in (None, b"", b"not an image"):
+                with self.subTest(photo=photo):
+                    data = render_docx(build_report(completed_result(1), audit_photo=photo), logo_path=Path(directory) / "missing.png")
+                    self.assertIn("Visible evidence 0.", docx_text(data))
+                    self.assertEqual(media_bytes(data), [])
+
+    def test_short_fixtures_fit_estimated_one_page_without_forced_breaks(self):
+        for count in (1, 2, 3, 4):
+            with self.subTest(count=count):
+                report = build_report(completed_result(count), audit_photo=photo_bytes((300, 900)))
+                layout = select_layout(report)
+                available = (11 - 1.15 - layout.margin) * 72 - 24
+                self.assertLessEqual(estimate_report_height(report, layout), available)
+                doc = Document(BytesIO(render_docx(report)))
+                self.assertFalse(doc.element.xpath('//w:br[@w:type="page"]'))
+                self.assertEqual(len(doc.sections), 1)
+                self.assertGreaterEqual(doc.styles["Normal"].font.size.pt, MIN_BODY_FONT_SIZE)
+
+    def test_dynamic_tuning_and_long_report_can_flow_without_truncation(self):
+        result = completed_result(3)
+        for opportunity in result.opportunities:
+            opportunity.evidence = "Synthetic merchandising evidence with clear test wording. " * 6
+            opportunity.recommendation = "Synthetic recommendation for testing report layout only. " * 4
+        report = build_report(result, audit_photo=photo_bytes())
+        self.assertNotEqual(select_layout(report), LAYOUT_PRESETS[0])
+        self.assertGreaterEqual(select_layout(report).body_size, MIN_BODY_FONT_SIZE)
+        result = completed_result(8)
+        for index, item in enumerate(result.opportunities):
+            item.evidence = f"Long test section {index}. " * 100
+        report = build_report(result, audit_photo=photo_bytes())
+        layout = select_layout(report)
+        self.assertGreater(estimate_report_height(report, layout), (11 - 1.15 - layout.margin) * 72)
+        data = render_docx(report)
+        text = docx_text(data)
+        for item in report.opportunities:
+            self.assertIn(item.evidence, text)
+            self.assertIn(item.recommendation, text)
+        doc = Document(BytesIO(data))
+        approval = next(p for p in doc.paragraphs if p.text.startswith("Approved By:"))
+        self.assertTrue(approval.paragraph_format.keep_with_next)
+        self.assertTrue(approval.paragraph_format.keep_together)
+
+    def test_docx_ui_does_not_import_audit_provider_pdf_or_preview(self):
+        script = '''
+import sys
+from shelf_audit.reporting.models import ShelfOpportunityReport
+from shelf_audit.reporting.docx_renderer import render_docx
+from shelf_audit.reporting.ui import render_report_section
+render_docx(ShelfOpportunityReport())
+assert not any(name.startswith('shelf_audit.providers') for name in sys.modules)
+for name in ('shelf_audit.audit', 'shelf_audit.reporting.pdf_renderer', 'shelf_audit.reporting.preview_renderer'):
+    assert name not in sys.modules, name
+'''
+        result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
+class ShelfAuditDocxUITests(unittest.TestCase):
+    def test_three_fields_one_download_no_preview_and_no_provider_calls(self):
+        import streamlit as st
+        result = completed_result(2)
+        app = AppTest.from_string('''
+from shelf_audit.page import render
+render()
+''')
+        app.session_state["shelf_audit_completed_result"] = result
+        with (
+            patch("shelf_audit.page.run_audit", side_effect=AssertionError("audit rerun")),
+            patch("shelf_audit.page.OpenAIAuditProvider", side_effect=AssertionError("provider constructed")),
+            patch("shelf_audit.reporting.ui.st.download_button", wraps=st.download_button) as download,
+            patch("shelf_audit.reporting.ui.st.html", side_effect=AssertionError("preview rendered")),
+        ):
+            app.run()
+            self.assertEqual(len(app.exception), 0)
+            self.assertEqual([field.label for field in app.text_input], ["Client", "Retailer", "Location"])
+            self.assertEqual(len(app.date_input), 0)
+            self.assertEqual(len(app.get("download_button")), 1)
+            self.assertEqual(len(app.button), 0)
+            self.assertEqual(download.call_args.args[0], "Download Report DOCX")
+            self.assertEqual(download.call_args.kwargs["on_click"], "ignore")
+            self.assertTrue(download.call_args.kwargs["file_name"].endswith(".docx"))
+            app.text_input(key="shelf_report_client").set_value("Test Client").run()
+            self.assertEqual(len(app.exception), 0)
+            self.assertIn("Test Client", docx_text(download.call_args.kwargs["data"]))
+            app.run()
+            self.assertEqual(len(app.exception), 0)
+            self.assertTrue(any(element.value == "Shelf Opportunities" for element in app.subheader))
+
+    def test_completed_audit_passes_original_photo_then_controls_never_reaudit(self):
+        import streamlit as st
+        original = photo_bytes((800, 300), "green")
+        replacement = photo_bytes((300, 800), "yellow")
+        uploaded = Mock()
+        uploaded.name, uploaded.type = "original.png", "image/png"
+        uploaded.getvalue.return_value = original
+        first, second = completed_result(2), completed_result(1)
+        app = AppTest.from_string('''
+from shelf_audit.page import render
+render()
+''')
+        with (
+            patch("shelf_audit.page.st.file_uploader", return_value=uploaded),
+            patch("shelf_audit.page.run_audit", side_effect=[first, second]) as audit,
+            patch("shelf_audit.page.OpenAIAuditProvider") as provider,
+            patch("shelf_audit.reporting.ui.st.download_button", wraps=st.download_button) as download,
+        ):
+            app.run()
+            app.radio(key="shelf_audit_image_source").set_value("Upload Existing Photo").run()
+            app.button(key="shelf_audit_analyze").click().run()
+            self.assertEqual(len(app.exception), 0)
+            self.assertEqual(audit.call_count, 1)
+            self.assertEqual(app.session_state["shelf_audit_completed_photo"], original)
+            self.assertIn(original, media_bytes(download.call_args.kwargs["data"]))
+            # Changing the input doesn't change the photo associated with the
+            # completed result until another explicit Analyze Shelf action.
+            uploaded.getvalue.return_value = replacement
+            app.text_input(key="shelf_report_location").set_value("Test Store").run()
+            self.assertEqual(len(app.exception), 0)
+            self.assertIn(original, media_bytes(download.call_args.kwargs["data"]))
+            self.assertNotIn(replacement, media_bytes(download.call_args.kwargs["data"]))
+            self.assertEqual(audit.call_count, 1)
+            self.assertEqual(provider.call_count, 1)
+            provider.return_value.analyze.assert_not_called()
+            app.button(key="shelf_audit_analyze").click().run()
+            self.assertEqual(len(app.exception), 0)
+            self.assertEqual(audit.call_count, 2)
+            self.assertIn(replacement, media_bytes(download.call_args.kwargs["data"]))
+            self.assertEqual(app.session_state["shelf_audit_completed_result"], second)
+
+    def test_failed_replacement_audit_clears_previous_photo_and_result(self):
+        uploaded = Mock()
+        uploaded.name, uploaded.type = "shelf.png", "image/png"
+        uploaded.getvalue.return_value = photo_bytes()
+        app = AppTest.from_string('''
+from shelf_audit.page import render
+render()
+''')
+        app.session_state["shelf_audit_completed_result"] = completed_result(1)
+        app.session_state["shelf_audit_completed_photo"] = photo_bytes()
+        with (
+            patch("shelf_audit.page.st.camera_input", return_value=uploaded),
+            patch("shelf_audit.page.run_audit", side_effect=RuntimeError("test failure")),
+            patch("shelf_audit.page.OpenAIAuditProvider"),
+        ):
+            app.run()
+            app.button(key="shelf_audit_analyze").click().run()
+            self.assertEqual(len(app.exception), 0)
+            self.assertNotIn("shelf_audit_completed_photo", app.session_state)
+            self.assertNotIn("shelf_audit_completed_result", app.session_state)
+            self.assertEqual(len(app.get("download_button")), 0)
+
+    def test_blank_fields_zero_findings_and_missing_photo_can_download(self):
+        import streamlit as st
+        app = AppTest.from_string('''
+from shelf_audit.reporting.ui import render_report_section
+from shelf_audit.models import AuditResult, AuditMode, AuditDepth
+render_report_section(AuditResult([], AuditMode.PRODUCT, AuditDepth.DEEP, 0))
+''')
+        with patch("shelf_audit.reporting.ui.st.download_button", wraps=st.download_button) as download:
+            app.run()
+            self.assertEqual(len(app.exception), 0)
+            self.assertEqual([field.label for field in app.text_input], ["Client", "Retailer", "Location"])
+            self.assertIn(NO_OPPORTUNITIES_TEXT, docx_text(download.call_args.kwargs["data"]))
+
+
+if __name__ == "__main__":
+    unittest.main()
