@@ -1,0 +1,2 @@
+# Test-only PDF inspection; not needed by the Shelf Audit app.
+pypdf>=6,<7

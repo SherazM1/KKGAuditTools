@@ -31,6 +31,7 @@ from .providers.openai import OpenAIAuditProvider, OpenAIProviderConfig
 from .infrastructure.cache import MemoryAuditCache
 from .infrastructure.rate_limit import MemoryRateLimiter, RateLimitError
 from .infrastructure.usage import MemoryUsageTracker
+from .reporting.ui import render_report_section
 
 
 # ---------------------------------------------------------
@@ -545,6 +546,9 @@ def render():
 
         if analyze:
 
+            st.session_state.pop("shelf_audit_completed_result", None)
+            st.session_state.pop("shelf_audit_report_document", None)
+
             try:
 
                 api_key = None
@@ -628,46 +632,24 @@ def render():
                 st.stop()
 
 
-            # -------------------------------------------------
-            # Results
-            # -------------------------------------------------
+            st.session_state["shelf_audit_completed_result"] = result
 
-            st.divider()
-
-            st.subheader("Shelf Opportunities")
-
-            if not result.opportunities:
-
-                st.info(
-                    "No opportunities were identified for this image."
-                )
-
-            else:
-
-                for index, opportunity in enumerate(
-                    result.opportunities,
-                    start=1,
-                ):
-
-                    st.markdown(
-                        f"### {index}. {opportunity.title}"
-                    )
-
-                    st.markdown(
-                        f"**Why:** {opportunity.evidence}"
-                    )
-
-                    st.markdown(
-                        f"**Recommendation:** "
-                        f"{opportunity.recommendation}"
-                    )
-
-                    st.write("")
-
-
-            st.divider()
-
-            st.caption(
-                f"{mode_config.label} · "
-                f"{depth_config.label}"
-            )
+    # Persist successful final results across report form/download reruns.
+    result = st.session_state.get("shelf_audit_completed_result")
+    if result is not None:
+        st.divider()
+        st.subheader("Shelf Opportunities")
+        if not result.opportunities:
+            st.info("No opportunities were identified for this image.")
+        else:
+            for index, opportunity in enumerate(result.opportunities, start=1):
+                st.markdown(f"### {index}. {opportunity.title}")
+                st.markdown(f"**Why:** {opportunity.evidence}")
+                st.markdown(f"**Recommendation:** {opportunity.recommendation}")
+                st.write("")
+        st.divider()
+        st.caption(
+            f"{get_mode_config(result.mode).label} · "
+            f"{get_depth_config(result.depth).label}"
+        )
+        render_report_section(result)
