@@ -1,9 +1,11 @@
 """Editable Word reports from final report data; no audit or Office dependency."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 import textwrap
+from zoneinfo import ZoneInfo
 
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
@@ -12,15 +14,19 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 from docx.text.paragraph import Paragraph
+from docx.text.run import Run
 from PIL import Image
 
 from .formatting import BLUE, NAVY, DEFAULT_LOGO_PATH, load_logo
 from .models import ShelfOpportunityReport
 from .templates import NO_OPPORTUNITIES_TEXT, WHY_LABEL, RECOMMENDATION_LABEL
 
-PHOTO_MAX_WIDTH = 3.15  # Inches; the same fixed box is used for both orientations.
-PHOTO_MAX_HEIGHT = 1.4
+PHOTO_MAX_WIDTH = 4.75  # Inches; the same fixed box is used for both orientations.
+PHOTO_MAX_HEIGHT = 2.1
 MIN_BODY_FONT_SIZE = 10.0
+BOOK_FONT = "Gotham-Book"
+MEDIUM_FONT = "Gotham-Medium"
+BOLD_FONT = "Gotham-Bold"
 
 
 @dataclass(frozen=True)
@@ -69,7 +75,7 @@ def estimate_report_height(report: ShelfOpportunityReport, layout: DocxLayout) -
     """Approximate body height in points, including a reserved approval area."""
     width = (8.5 - 2 * layout.margin) * 72
     metadata_height = sum(
-        _line_count(f"{label}: {value or ''}", width / 2 - 16, layout.body_size)
+        _line_count(f"{label}: {value or ''}", width - (PHOTO_MAX_WIDTH + 0.2) * 72 - 12, layout.body_size)
         * layout.body_size * 1.12 + layout.metadata_spacing
         for label, value in (
             ("Client", report.metadata.client), ("Retailer", report.metadata.retailer),
@@ -110,6 +116,15 @@ def _rule(paragraph: Paragraph) -> None:
     paragraph._p.get_or_add_pPr().append(borders)
 
 
+def _set_font(run: Run, family: str) -> None:
+    """Reference the installed face, without embedding or synthetic bolding."""
+    run.font.name = family
+    run.bold = False
+    fonts = run._r.get_or_add_rPr().rFonts
+    for script in ("ascii", "hAnsi", "eastAsia", "cs"):
+        fonts.set(qn(f"w:{script}"), family)
+
+
 def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFAULT_LOGO_PATH) -> bytes:
     """Render editable paragraphs and original image bytes without modifying data.
 
@@ -125,7 +140,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
     section.header_distance = section.footer_distance = Inches(0.3)
     width = 8.5 - 2 * layout.margin
     normal = document.styles["Normal"]
-    normal.font.name = "Arial"
+    normal.font.name = BOOK_FONT
     normal.font.size = Pt(layout.body_size)
     normal.font.color.rgb = RGBColor.from_string(NAVY.lstrip("#"))
     normal.paragraph_format.line_spacing = 1.12
@@ -135,7 +150,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
     document.core_properties.author = "Kendal King"
 
     def format_paragraph(
-        paragraph: Paragraph, *, size: float | None = None, bold: bool = False,
+        paragraph: Paragraph, *, size: float | None = None, font: str = BOOK_FONT,
         blue: bool = False, after: float = 3, before: float = 0,
         keep_next: bool = False, keep_lines: bool = False,
     ) -> None:
@@ -144,7 +159,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         paragraph.paragraph_format.keep_with_next = keep_next
         paragraph.paragraph_format.keep_together = keep_lines
         for run in paragraph.runs:
-            run.bold = bold
+            _set_font(run, font)
             run.font.size = Pt(size or layout.body_size)
             run.font.color.rgb = RGBColor.from_string((BLUE if blue else NAVY).lstrip("#"))
 
@@ -167,10 +182,10 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         logo_cell.paragraphs[0].add_run().add_picture(BytesIO(logo), width=Inches(0.55))
     title = identity_cell.paragraphs[0]
     title.add_run(report.title)
-    format_paragraph(title, size=19, bold=True, after=2)
+    format_paragraph(title, size=19, font=BOLD_FONT, after=2)
     if report.subtitle:
-        subtitle = identity_cell.add_paragraph(report.subtitle)
-        format_paragraph(subtitle, size=10, after=0)
+        subtitle = identity_cell.add_paragraph(report.subtitle.upper())
+        format_paragraph(subtitle, size=10, font=MEDIUM_FONT, blue=True, after=0)
 
     # Inline table avoids floating positioning; original photo is in a fixed box.
     top_table = document.add_table(rows=1, cols=2)
@@ -188,8 +203,8 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         ("Location", report.metadata.location),
     )):
         paragraph = metadata_cell.paragraphs[0] if index == 0 else metadata_cell.add_paragraph()
-        paragraph.add_run(f"{label}: ").bold = True
-        paragraph.add_run(value or "")
+        _set_font(paragraph.add_run(f"{label}: "), MEDIUM_FONT)
+        _set_font(paragraph.add_run(value or ""), BOOK_FONT)
         paragraph.paragraph_format.space_after = Pt(layout.metadata_spacing)
     dimensions = _photo_dimensions(report.audit_photo)
     if dimensions:
@@ -211,14 +226,14 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         heading = document.add_paragraph()
         heading.add_run(f"{item.number:02d}  ")
         heading.add_run(item.title)
-        format_paragraph(heading, size=layout.title_size, bold=True, before=layout.section_spacing, after=4, keep_next=True)
+        format_paragraph(heading, size=layout.title_size, font=BOLD_FONT, before=layout.section_spacing, after=4, keep_next=True)
         _rule(heading)
         for label, text, last in (
             (WHY_LABEL, item.evidence, False),
             (RECOMMENDATION_LABEL, item.recommendation, True),
         ):
             paragraph = document.add_paragraph(label.upper())
-            format_paragraph(paragraph, size=9, bold=True, blue=True, after=1, keep_next=True)
+            format_paragraph(paragraph, size=9, font=MEDIUM_FONT, blue=True, after=1, keep_next=True)
             paragraph = document.add_paragraph(text)
             format_paragraph(paragraph, after=3, keep_next=short_section and not last, keep_lines=short_section)
     if not report.opportunities:
@@ -226,12 +241,15 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
 
     # These are ordinary editable paragraphs, not image-based signature artwork.
     for index, label in enumerate(("Approved By", "Signature", "Date")):
-        paragraph = document.add_paragraph(f"{label}:  ______________________________")
+        paragraph = document.add_paragraph()
+        paragraph.add_run(f"{label}:")
+        paragraph.add_run("  ______________________________")
         format_paragraph(paragraph, after=8, before=12 if index == 0 else 0, keep_next=index < 2, keep_lines=True)
+        _set_font(paragraph.runs[0], MEDIUM_FONT)
         if index == 0:
             _rule(paragraph)
     footer = section.footer.paragraphs[0]
-    footer.add_run(report.footer_text)
+    footer.add_run(f"{report.footer_text} {datetime.now(ZoneInfo('America/Chicago')).year}")
     format_paragraph(footer, size=8, after=0)
     _rule(footer)
     output = BytesIO()
