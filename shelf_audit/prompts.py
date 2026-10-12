@@ -2,7 +2,6 @@
 Prompt construction for the shelf audit tool.
 
 This module is provider-neutral.
-
 It does not call any AI API directly.
 """
 
@@ -14,7 +13,7 @@ from .audit_modes import get_mode_config, get_depth_config
 from .models import AuditMode, AuditDepth, TargetRegion
 
 
-PROMPT_VERSION = "v13"
+PROMPT_VERSION = "v14"
 
 
 def _compact_criteria(
@@ -403,8 +402,8 @@ Use the broader KKG toolkit only when the image clearly supports the format.
 
 When supported by the image, KKG solutions may include:
 
-- shelf and fixture reconfiguration, dividers, rails, channels, facings,
-  grouping, and stacking support
+- shelf and fixture reconfiguration, dividers, rails, channels, branded
+  containment, navigation support, and stacking support
 - branded trays, tiered trays, compact PDQs, countertop displays, small racks,
   wire or metal racks, dedicated racks, and product risers
 - shelf strips, shelf talkers, shelf blades, price-rail graphics,
@@ -535,6 +534,7 @@ materials, and competitive executions as context when they help explain the
 selected target's opportunity.
 
 Examples:
+
 - inline shelf context may support shelf graphics, trays, PDQs, risers,
   dividers, compact racks, or supported headers
 - pegboard or hanging-fixture context may support navigation graphics, headers,
@@ -555,12 +555,21 @@ that is not visible, but do not ignore a larger-format opportunity when the
 image itself establishes the required placement.
 
 For an existing fixture or display, internally compare:
-- improve, brand, or retrofit what is already there
+
+- improve or brand what is already there
+- structurally modify the existing fixture when a physical change is supported
 - replace it with a better purpose-built KKG fixture or display
 
+When improving the current fixture and replacing it with a purpose-built branded
+fixture are BOTH physically supported and represent meaningfully different KKG
+scopes, generate BOTH as separate candidate opportunities before ranking.
+
+Do not collapse a fixture-enhancement candidate and a fixture-replacement
+candidate merely because they address the same visible weakness.
+
 Recommend replacement only when the visible fixture is generic, under-branded,
-poorly suited, or otherwise weak enough that replacement is a meaningful and
-physically supported opportunity.
+poorly suited, price-dominated, or otherwise weak enough that replacement is a
+meaningful and physically supported opportunity.
 
 PHYSICAL SOLUTION SELECTION:
 
@@ -590,7 +599,8 @@ solutions that fit:
 - assortment size
 - current merchandising method
 - fixture type and fixture quality
-- whether the existing fixture should be improved or replaced
+- whether the existing fixture should be improved, structurally modified, or replaced
+- whether improvement and replacement are distinct enough to deserve separate candidates
 - available shelf or floor space
 - placement context
 
@@ -807,7 +817,7 @@ Look for:
 - weak navigation between related products
 
 When supported, consider:
-- grouping changes
+- navigation or branded organization
 - dividers
 - branded trays
 - compact PDQs
@@ -957,12 +967,16 @@ Before writing findings, internally follow this order:
    merchandising, branding, signage, fixture, display, or shopper need.
 4. Exclude maintenance-only actions from the candidate findings.
 5. Ask what KKG could design, print, fabricate, kit, assemble, install, brand,
-   retrofit, upgrade, or replace to address the need.
-6. For an existing fixture, consider both improving it and replacing it with a
-   better branded fixture when the scene supports that comparison.
-7. Use the visible placement to determine the largest and smallest formats that
+   modify, upgrade, or replace to address the need.
+6. For an existing fixture, consider improving it, structurally modifying it,
+   and replacing it with a better branded fixture when the scene supports those
+   options.
+7. When enhancement and replacement are both strongly supported and represent
+   materially different KKG scopes, preserve both as separate candidates before
+   ranking rather than collapsing them into one idea.
+8. Use the visible placement to determine the largest and smallest formats that
    are genuinely plausible.
-8. Choose the strongest grounded KKG opportunity, then say it simply.
+9. Choose the strongest grounded KKG opportunities, then say them simply.
 
 Do not output this reasoning process.
 
@@ -1170,6 +1184,10 @@ Explain them through the surrounding plain-language sentence.
 
 Do not add unnecessary fixture-engineering detail.
 
+Avoid the client-facing word "retrofit" when plain language such as "update the
+existing display", "modify the rack", "replace the front rails", or "add new
+fixture components" communicates the idea more clearly.
+
 OPPORTUNITY COVERAGE:
 
 Do not stop after finding one or two good opportunities.
@@ -1226,9 +1244,16 @@ problem belong in one opportunity, not three.
 Different criterion IDs or different wording do not make findings distinct when
 they solve the same problem in essentially the same way.
 
-Combine alternatives for one problem into one recommendation.
+Combine closely related alternatives for one problem into one recommendation.
 
-Separate findings only when they address meaningfully different needs.
+Do NOT automatically combine fixture enhancement and fixture replacement.
+
+They may address the same visible weakness but still represent meaningfully
+different KKG scopes and should remain separate candidates when both are strongly
+and physically supported.
+
+Separate findings when they address meaningfully different needs OR materially
+different KKG scopes, such as improving an existing fixture versus replacing it.
 
 Do not repeat the same evidence or benefit simply to fill result slots.
 
@@ -1269,8 +1294,13 @@ Do not inflate scores merely to make an opportunity rank higher.
 
 Return at most one opportunity for each criterion ID.
 
-If multiple observations relate to the same criterion, combine them into the
-single strongest grounded opportunity rather than returning duplicates.
+If fixture enhancement and fixture replacement are both valid, map them to the
+most appropriate distinct criteria when the criteria library supports that
+separation rather than forcing both into one criterion.
+
+If multiple observations relate to the same criterion and represent the same
+KKG scope, combine them into the single strongest grounded opportunity rather
+than returning duplicates.
 
 Do not create or score maintenance-only candidates.
 
@@ -1322,8 +1352,13 @@ For each recommendation, ask:
   broader KKG opportunity when that broader opportunity is genuinely supported?
 - Did I consider whether the visible placement supports a larger KKG format,
   such as a rack, endcap, floorstand, or pallet display?
-- If an existing fixture is generic, under-branded, or poorly suited, did I
-  consider whether KKG could upgrade or replace it?
+- If an existing fixture is generic, under-branded, price-dominated, or poorly
+  suited, did I consider whether KKG could upgrade or replace it?
+- If both enhancement and replacement are strongly supported and materially
+  different, did I preserve both as candidates before ranking instead of
+  discarding the replacement idea too early?
+- Did I avoid treating fixture enhancement and fixture replacement as duplicates
+  merely because they address the same visible weakness?
 - Am I using a generic physical description where a recognizable KKG format
   would be clearer?
 - Did I add words that sound strategic or polished without adding information?
