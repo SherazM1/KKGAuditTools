@@ -348,8 +348,8 @@
     "id": "shelf_space_utilization",
     "category": "Placement",
     "applies_when": "Visible shelf, tray, or pegboard space exists around the selected product and the current use of that existing merchandising footprint can be evaluated.",
-    "check": "Is the product using its current visible shelf, tray, or pegboard allocation effectively, or are meaningful gaps, weak facings, underfilled zones, or poorly used areas reducing the strength of the presentation?",
-    "suggestion": "Improve facings, blocking, placement, density, or use of the existing merchandising footprint. Consider a tray, divider, riser, rack, or shelf communication element only when the visible space and product geometry support a stronger physical solution.",
+    "check": "Is the visible shelf, tray, pegboard, or rack footprint being used in a way that creates a strong product presentation, or does the space support a meaningful structural merchandising improvement such as containment, reconfiguration, elevation, or a dedicated shelf-level component?",
+    "suggestion": "When the visible footprint supports a real physical merchandising improvement, use shelf reconfiguration, a branded tray, divider, rack, compact PDQ, or product riser that fits the product and available support. Do not return facing, blocking, straightening, pulling forward, or product movement as recommendations. If the only issue is ordinary store maintenance, return no opportunity for this criterion.",
     "priority": 0.9,
     "opportunity_type": "space_utilization",
     "opportunity_scale": "fixture_enhancement",
@@ -358,9 +358,9 @@
       "empty shelf space",
       "large gaps",
       "unused pegboard",
-      "limited facings",
       "underfilled product area",
-      "small product block within a larger available area"
+      "small product block within a larger available area",
+      "visible footprint that could support a structural merchandising component"
     ],
     "fixture_types": [
       "shelf",
@@ -383,10 +383,10 @@
     "do_not_suggest_when": [
       "the image does not establish ownership of the open space",
       "the gap may clearly belong to another product",
-      "additional product or fixture would obstruct shopper access"
+      "additional product or fixture would obstruct shopper access",
+      "the only visible issue is ordinary facing, straightening, blocking, or product placement maintenance"
     ],
     "opportunity_formats": [
-      "additional_facings",
       "shelf_reconfiguration",
       "branded_tray",
       "divider",
@@ -631,9 +631,9 @@
   {
     "id": "dedicated_display_opportunity",
     "category": "Display Structure",
-    "applies_when": "The selected product is merchandised on standard retail infrastructure and visible evidence supports moving beyond a modest shelf-level enhancement to a truly dedicated branded merchandising structure.",
-    "check": "Does the visible need justify a compact dedicated product destination or larger branded structure beyond what simple facing, a divider, a product riser, or a modest tray could solve, with enough product and visible space for that format?",
-    "suggestion": "Choose the smallest meaningful dedicated structure: a compact PDQ, dedicated rack, or compact branded fixture when visible product size, quantity, assortment, and shelf space justify it. A wire or metal rack is a construction option when the visible support and product needs fit; do not infer permanence. Larger formats require their own visible placement context: side-of-fixture space for a sidekick, appropriate side-facing or end-of-run space for a sidecap, aisle-end evidence for an endcap, floor space for a floorstand, and pallet-scale space with enough visible product volume for a pallet display.",
+    "applies_when": "The selected product is merchandised on standard retail infrastructure OR within an existing generic, under-branded, poorly suited, or weak dedicated fixture, and visible evidence supports moving to a stronger purpose-built branded merchandising structure or substantially upgrading the current one.",
+    "check": "Does the visible product, quantity, assortment, placement, or fixture quality justify a dedicated branded presentation beyond a modest shelf enhancement? If an existing fixture is present, would KKG create more value by substantially upgrading it or replacing it with a better purpose-built branded fixture?",
+    "suggestion": "Consider a compact PDQ, dedicated rack, branded fixture, or replacement fixture when visible product size, quantity, assortment, footprint, and fixture quality support a dedicated presentation. For an existing generic or weak fixture, compare a meaningful branded upgrade with replacement rather than assuming graphics alone are sufficient. Larger formats require their own visible placement context: side-of-fixture space for a sidekick, appropriate side-facing or end-of-run space for a sidecap, aisle-end evidence for an endcap, floor space for a floorstand, and pallet-scale placement with enough visible product volume for a quarter-, half-, or full-pallet display.",
     "priority": 0.95,
     "opportunity_type": "display_structure",
     "opportunity_scale": "dedicated_display",
@@ -645,7 +645,10 @@
       "limited dedicated branding",
       "large product grouping",
       "available fixture or floor space",
-      "secondary merchandising potential"
+      "secondary merchandising potential",
+      "generic or unbranded existing fixture",
+      "existing fixture with weak brand ownership",
+      "existing fixture that appears poorly suited to the merchandise"
     ],
     "fixture_types": [
       "shelf",
@@ -673,7 +676,7 @@
       "an aisle-end location is not visible but an endcap is being considered",
       "floor space is not visible but a floorstand is being considered",
       "product volume is too small for the proposed format",
-      "a modest shelf-level enhancement would adequately solve the visible condition"
+      "a modest shelf-level enhancement clearly solves the visible need and the existing fixture is otherwise effective"
     ],
     "opportunity_formats": [
       "pdq",
@@ -682,10 +685,13 @@
       "wire_rack",
       "metal_rack",
       "branded_fixture",
+      "fixture_upgrade",
+      "replacement_branded_fixture",
       "sidekick",
       "sidecap",
       "endcap",
       "floorstand",
+      "quarter_pallet",
       "half_pallet",
       "full_pallet"
     ]
@@ -746,8 +752,8 @@
     "id": "display_capacity_utilization",
     "category": "Placement",
     "applies_when": "A dedicated display fixture has visible product capacity or merchandising zones.",
-    "check": "Is the available display capacity being used intentionally, or does the fixture appear meaningfully underfilled, poorly organized, or structurally mismatched to the merchandise?",
-    "suggestion": "Improve the existing display through facings, product flow, shelf reconfiguration, a tray insert, or a tiered insert when visible product shapes, support, and clearance fit. Consider resizing or retrofitting the fixture only when the visible mismatch supports a structural issue rather than temporary sell-down. Do not assume additional inventory will be available.",
+    "check": "Does the existing display show a meaningful structural mismatch between its available capacity and the merchandise, such as persistent unused zones, poorly matched shelf spacing, or capacity that could be better used through a physical insert, reconfiguration, resize, or retrofit?",
+    "suggestion": "When the visible mismatch appears structural rather than temporary sell-down, improve the display with shelf reconfiguration, a tray insert, tiered insert, supported stacking solution, fixture resize, or fixture retrofit. Do not recommend additional facings, product reflow, straightening, or other store-maintenance actions. Do not assume additional inventory will be available.",
     "priority": 0.85,
     "opportunity_type": "space_utilization",
     "opportunity_scale": "fixture_enhancement",
@@ -780,13 +786,12 @@
       "secondary display"
     ],
     "do_not_suggest_when": [
-      "the image cannot distinguish temporary sell-down from structural underutilization"
+      "the image cannot distinguish temporary sell-down from structural underutilization",
+      "the only visible improvement would be facing, product reflow, straightening, or other store maintenance"
     ],
     "opportunity_formats": [
-      "additional_facings",
       "shelf_reconfiguration",
       "stacking",
-      "product_reflow",
       "tray_insert",
       "tiered_insert",
       "fixture_resize",
@@ -843,20 +848,20 @@
   },
   {
     "id": "product_visibility_obstruction",
-    "category": "Shelf Execution",
-    "applies_when": "Part of the selected product, package face, branding, or product communication is visibly blocked or difficult to see.",
-    "check": "Is the primary product face or communication obscured by adjacent products, shelf hardware, signage, fixture components, or poor placement?",
-    "suggestion": "Correct the obstruction. If the obstruction appears structural or recurring, consider a tray, divider, shelf-management component, fixture adjustment, or redesigned merchandising element that preserves product visibility.",
+    "category": "Merchandising",
+    "applies_when": "Part of the selected product, package face, branding, or product communication is visibly blocked and the obstruction appears tied to the fixture, shelf-management system, or recurring merchandising setup rather than a one-off misplaced product.",
+    "check": "Is product visibility being reduced by a structural or recurring condition such as shelf hardware, fixture components, containment, or the merchandising system in a way that KKG could physically improve?",
+    "suggestion": "When the obstruction is structural or recurring, use a tray, divider, shelf-management component, fixture adjustment, or redesigned merchandising element that preserves product visibility. Do not return turning, facing, moving, or repositioning merchandise as the recommendation. If the obstruction is only a one-off store-maintenance issue, return no opportunity for this criterion.",
     "priority": 0.9,
     "opportunity_type": "visibility",
-    "opportunity_scale": "execution",
+    "opportunity_scale": "fixture_enhancement",
     "commercial_leverage": 0.7,
     "visual_signals": [
       "blocked product face",
       "shelf lip covering package",
-      "adjacent product obstruction",
+      "recurring obstruction from adjacent merchandise",
       "fixture hardware obstruction",
-      "hidden branding"
+      "hidden branding caused by fixture or merchandising structure"
     ],
     "fixture_types": [
       "shelf",
@@ -880,32 +885,33 @@
       "secondary display"
     ],
     "do_not_suggest_when": [
-      "the apparent obstruction is caused only by camera angle"
+      "the apparent obstruction is caused only by camera angle",
+      "the obstruction is only a one-off product position that store staff could correct by moving, facing, or turning merchandise"
     ],
     "opportunity_formats": [
-      "placement_adjustment",
       "fixture_adjustment",
-      "facing_adjustment",
       "tray",
-      "divider"
+      "divider",
+      "shelf_management_component",
+      "fixture_redesign"
     ]
   },
   {
     "id": "facing_presentation_opportunity",
-    "category": "Shelf Execution",
-    "applies_when": "Multiple units or facings of the selected product are visible.",
-    "check": "Are the visible units faced, aligned, grouped, and contained in a way that creates a clear and intentional product presentation?",
-    "suggestion": "Correct facing and grouping when simple maintenance is enough. If visible containment or fixture problems suggest recurring disorder, consider a branded tray, small rack, wire rack, divider, channel, or rail that fits the products and available support. A compact PDQ may be appropriate when visible quantity, assortment, and shelf space justify it; do not add a fixture for an isolated alignment issue.",
+    "category": "Merchandising",
+    "applies_when": "Multiple units of the selected product are visible and the presentation shows a recurring containment, support, or organization-system weakness that a physical merchandising component could address.",
+    "check": "Do repeated alignment, orientation, spacing, or containment problems indicate that the current shelf or fixture lacks a physical system needed to keep the product presented consistently?",
+    "suggestion": "When repeated disorder points to a recurring containment or fixture problem, use a branded tray, compact PDQ, small rack, wire rack, divider, channel, or rail that fits the products and visible support. Treat misalignment or poor facing only as evidence. Never recommend straightening, facing, turning, regrouping, or tidying merchandise. If the issue is isolated store maintenance, return no opportunity for this criterion.",
     "priority": 0.75,
     "opportunity_type": "product_presentation",
-    "opportunity_scale": "execution",
+    "opportunity_scale": "fixture_enhancement",
     "commercial_leverage": 0.65,
     "visual_signals": [
-      "multiple facings",
-      "misaligned packages",
-      "mixed product orientation",
-      "uneven rows",
-      "disorganized grouping"
+      "repeatedly unstable product rows",
+      "recurring mixed product orientation",
+      "uneven rows suggesting weak containment",
+      "products spreading or falling outside a clear presentation system",
+      "visible lack of containment or support"
     ],
     "fixture_types": [
       "shelf",
@@ -929,10 +935,10 @@
     ],
     "do_not_suggest_when": [
       "only one unit is visible",
-      "the apparent disorder is caused by occlusion or camera angle"
+      "the apparent disorder is caused by occlusion or camera angle",
+      "the issue is an isolated facing, alignment, turning, or straightening problem"
     ],
     "opportunity_formats": [
-      "facing_adjustment",
       "tray",
       "branded_tray",
       "product_divider",
