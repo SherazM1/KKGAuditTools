@@ -8,7 +8,7 @@ import textwrap
 from zoneinfo import ZoneInfo
 
 from docx import Document
-from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT, WD_ROW_HEIGHT_RULE
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -29,8 +29,10 @@ MIN_BODY_FONT_SIZE = 10.0
 BOOK_FONT = "Gotham-Book"
 MEDIUM_FONT = "Gotham-Medium"
 BOLD_FONT = "Gotham-Bold"
-PHOTO_COLUMN_WIDTH = 2.8
-CELL_PADDING = 0.08  # Combined horizontal cell padding, in inches.
+FRAME_X = 5.15  # Page-relative inches: 8.5 - 0.65 right margin - 2.7 frame.
+FRAME_Y = 1.35
+FRAME_BORDER_PT = 1.5
+TEXT_CLEARANCE = 0.15
 
 
 @dataclass(frozen=True)
@@ -115,13 +117,14 @@ def estimate_report_height(report: ShelfOpportunityReport, layout: DocxLayout) -
     """Estimate the fixed composition; never use this to choose a structure."""
     width = (8.5 - 2 * layout.margin) * 72
     has_photo = photo_size(report, layout) is not None
-    left_width = width - (PHOTO_COLUMN_WIDTH + CELL_PADDING) * 72
-    first_height = _opportunity_height(report.opportunities[0], layout, left_width) if report.opportunities else 24
-    height = _metadata_height(report, layout, width) + layout.content_spacing
-    height += max(first_height, FRAME_HEIGHT * 72 + 6) if has_photo else 0
-    for item in report.opportunities[1 if has_photo else 0:]:
-        height += _opportunity_height(item, layout, width)
-    if not report.opportunities and not has_photo:
+    text_width = width - (FRAME_WIDTH + TEXT_CLEARANCE) * 72 if has_photo else width
+    # Conservatively measure text at the upper-region width. Word releases the
+    # width below the frame via native square wrapping. No image height or image
+    # row is counted, so portrait/landscape cannot alter vertical spacing.
+    height = _metadata_height(report, layout, text_width) + layout.content_spacing
+    for item in report.opportunities:
+        height += _opportunity_height(item, layout, text_width)
+    if not report.opportunities:
         height += 24
     return height + layout.signature_spacing + 48
 
@@ -147,6 +150,60 @@ def _set_font(run: Run, family: str) -> None:
     fonts = run._r.get_or_add_rPr().rFonts
     for script in ("ascii", "hAnsi", "eastAsia", "cs"):
         fonts.set(qn(f"w:{script}"), family)
+
+
+def _add_audit_anchor(paragraph: Paragraph, data: bytes, size: tuple[float, float]) -> None:
+    """One framed picture anchored to the page, with horizontal-only wrapping.
+
+    DrawingML fillRect insets letterbox the original image inside the fixed shape
+    (https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.drawing.fillrectangle).
+    The embedded bytes remain unchanged; only picture geometry is formatted.
+    """
+    inline = paragraph.add_run().add_picture(BytesIO(data), width=Inches(FRAME_WIDTH), height=Inches(FRAME_HEIGHT))._inline
+    picture = inline.xpath(".//pic:pic")[0]
+    fill = picture.xpath("pic:blipFill/a:stretch/a:fillRect")[0]
+    horizontal = round((1 - size[0] / FRAME_WIDTH) * 50000)
+    vertical = round((1 - size[1] / FRAME_HEIGHT) * 50000)
+    for edge, inset in (("l", horizontal), ("r", horizontal), ("t", vertical), ("b", vertical)):
+        fill.set(edge, str(inset))
+    outline = OxmlElement("a:ln")
+    outline.set("w", str(int(FRAME_BORDER_PT * 12700)))
+    color_fill = OxmlElement("a:solidFill")
+    color = OxmlElement("a:srgbClr")
+    color.set("val", NAVY.lstrip("#"))
+    color_fill.append(color)
+    outline.append(color_fill)
+    picture.xpath("pic:spPr")[0].append(outline)
+
+    anchor = OxmlElement("wp:anchor")
+    for key, value in (("distT", "0"), ("distB", "0"), ("distL", str(int(Inches(TEXT_CLEARANCE)))), ("distR", "0"),
+                       ("simplePos", "0"), ("relativeHeight", "0"), ("behindDoc", "0"),
+                       ("locked", "1"), ("layoutInCell", "0"), ("allowOverlap", "1")):
+        anchor.set(key, value)
+    simple = OxmlElement("wp:simplePos")
+    simple.set("x", "0")
+    simple.set("y", "0")
+    anchor.append(simple)
+    for axis, position in (("H", FRAME_X), ("V", FRAME_Y)):
+        element = OxmlElement(f"wp:position{axis}")
+        element.set("relativeFrom", "page")
+        offset = OxmlElement("wp:posOffset")
+        offset.text = str(int(Inches(position)))
+        element.append(offset)
+        anchor.append(element)
+    anchor.append(inline.extent)
+    effect = OxmlElement("wp:effectExtent")
+    for edge in ("l", "t", "r", "b"):
+        effect.set(edge, "0")
+    anchor.append(effect)
+    wrap = OxmlElement("wp:wrapSquare")
+    wrap.set("wrapText", "left")
+    anchor.append(wrap)
+    for tag in ("wp:docPr", "wp:cNvGraphicFramePr", "a:graphic"):
+        element = inline.find(qn(tag))
+        if element is not None:
+            anchor.append(element)
+    inline.getparent().replace(inline, anchor)
 
 
 def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFAULT_LOGO_PATH) -> bytes:
@@ -241,81 +298,14 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
     paragraph.paragraph_format.space_after = Pt(layout.metadata_spacing + layout.content_spacing)
 
     size = photo_size(report, layout)
-    beside_count = 1 if size and report.opportunities else 0
     if size:
-        top_table = document.add_table(rows=1, cols=2)
-        top_table.alignment = WD_TABLE_ALIGNMENT.CENTER
-        top_table.autofit = False
-        copy_cell, photo_cell = top_table.rows[0].cells
-        for column, cell, fraction in zip(top_table.columns, (copy_cell, photo_cell), ((width - PHOTO_COLUMN_WIDTH) / width, PHOTO_COLUMN_WIDTH / width)):
-            column.width = cell.width = Inches(width * fraction)
-            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
-            margins = OxmlElement("w:tcMar")
-            for edge in ("left", "right"):
-                margin = OxmlElement(f"w:{edge}")
-                margin.set(qn("w:w"), str(round(CELL_PADDING * 1440 / 2)))
-                margin.set(qn("w:type"), "dxa")
-                margins.append(margin)
-            cell._tc.get_or_add_tcPr().append(margins)
-        # Explicitly suppress inherited borders, including internal rules.
-        borders = OxmlElement("w:tblBorders")
-        for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
-            border = OxmlElement(f"w:{edge}")
-            border.set(qn("w:val"), "nil")
-            borders.append(border)
-        top_table._tbl.tblPr.append(borders)
-        # Permit ordinary Word pagination for long copy; no forced row heights
-        # or whole-row keep rules on the recommendation cell.
-        copy_cell.paragraphs[0].paragraph_format.line_spacing = Pt(1)
-        copy_cell.paragraphs[0].paragraph_format.space_after = Pt(0)
-        for item in report.opportunities[:beside_count]:
-            add_opportunity(copy_cell, item, width - PHOTO_COLUMN_WIDTH - CELL_PADDING)
-        if not report.opportunities:
-            copy_cell.paragraphs[0].add_run(NO_OPPORTUNITIES_TEXT)
-            format_paragraph(copy_cell.paragraphs[0])
-            copy_cell.paragraphs[0].paragraph_format.line_spacing = 1.12
-        # The nested table supplies a fixed frame without floating objects.
-        photo_cell.paragraphs[0].paragraph_format.line_spacing = Pt(1)
-        photo_cell.paragraphs[0].paragraph_format.space_after = Pt(0)
-        frame = photo_cell.add_table(rows=1, cols=1)
-        frame.autofit = False
-        frame.alignment = WD_TABLE_ALIGNMENT.RIGHT
-        frame.columns[0].width = frame.cell(0, 0).width = Inches(FRAME_WIDTH)
-        frame.rows[0].height = Inches(FRAME_HEIGHT)
-        frame.rows[0].height_rule = WD_ROW_HEIGHT_RULE.EXACTLY
-        frame.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
-        frame_cell = frame.cell(0, 0)
-        frame_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-        padding = OxmlElement("w:tcMar")
-        for edge, inches in (("left", 0.06), ("right", 0.06), ("top", 0.05), ("bottom", 0.05)):
-            margin = OxmlElement(f"w:{edge}")
-            margin.set(qn("w:w"), str(int(inches * 1440)))
-            margin.set(qn("w:type"), "dxa")
-            padding.append(margin)
-        frame_cell._tc.get_or_add_tcPr().append(padding)
-        borders = OxmlElement("w:tblBorders")
-        for edge in ("top", "left", "bottom", "right"):
-            border = OxmlElement(f"w:{edge}")
-            for key, value in (("val", "single"), ("sz", "4"), ("color", NAVY.lstrip("#"))):
-                border.set(qn(f"w:{key}"), value)
-            borders.append(border)
-        frame._tbl.tblPr.append(borders)
-        paragraph = frame_cell.paragraphs[0]
-        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        paragraph.paragraph_format.space_before = paragraph.paragraph_format.space_after = Pt(0)
-        paragraph.paragraph_format.line_spacing = 1.0
-        run = paragraph.add_run()
-        run.font.size = Pt(1)
-        run.add_picture(BytesIO(report.audit_photo), width=Inches(size[0]), height=Inches(size[1]))
-        photo_cell.paragraphs[-1].paragraph_format.line_spacing = Pt(1)
-        photo_cell.paragraphs[-1].paragraph_format.space_after = Pt(0)
-    spacer = document.add_paragraph()
-    spacer.paragraph_format.space_after = Pt(0)
-    spacer.paragraph_format.line_spacing = Pt(1)
-
-    for item in report.opportunities[beside_count:]:
-        add_opportunity(document, item, width)
-    if not report.opportunities and size is None:
+        # Stable first metadata paragraph owns one page-relative anchor. It has
+        # no inline extent, table, or frame-height spacer in the body flow.
+        _add_audit_anchor(document.paragraphs[0], report.audit_photo, size)
+    text_width = width - FRAME_WIDTH - TEXT_CLEARANCE if size else width
+    for item in report.opportunities:
+        add_opportunity(document, item, text_width)
+    if not report.opportunities:
         document.add_paragraph(NO_OPPORTUNITIES_TEXT)
 
     # These are ordinary editable paragraphs, not image-based signature artwork.

@@ -23,7 +23,7 @@ from shelf_audit.reporting import ReportMetadata, build_report
 from shelf_audit.reporting.docx_renderer import (
     LAYOUT_PRESETS, MIN_BODY_FONT_SIZE, PHOTO_MAX_WIDTH, PHOTO_MAX_HEIGHT,
     estimate_report_height, render_docx, select_layout,
-    photo_box_width, FRAME_WIDTH, FRAME_HEIGHT,
+    photo_box_width, FRAME_WIDTH, FRAME_HEIGHT, FRAME_X, FRAME_Y,
 )
 from shelf_audit.reporting.formatting import DEFAULT_LOGO_PATH
 from shelf_audit.reporting.formatting import BLUE
@@ -64,34 +64,45 @@ def media_bytes(data):
 
 
 class ShelfAuditDocxTests(unittest.TestCase):
-    def test_fixed_structure_and_frame_across_counts_and_orientations(self):
+    def test_page_anchor_is_fixed_and_independent_from_body_flow(self):
         for count in (0, 1, 2, 3, 4, 8):
             for size in ((300, 900), (900, 300)):
                 with self.subTest(count=count, size=size):
                     report = build_report(completed_result(count), audit_photo=photo_bytes(size))
                     doc = Document(BytesIO(render_docx(report)))
-                    self.assertEqual(len(doc.tables), 1)
-                    self.assertEqual([p.text for p in doc.paragraphs[:3]], ["Client: ", "Retailer: ", "Location: "])
-                    left = "\n".join(p.text for p in doc.tables[0].cell(0, 0).paragraphs)
-                    body = "\n".join(p.text for p in doc.paragraphs)
-                    if count:
-                        for value in (report.opportunities[0].title, report.opportunities[0].evidence, report.opportunities[0].recommendation):
-                            self.assertIn(value, left)
-                            self.assertNotIn(value, body)
-                    for item in report.opportunities[1:]:
+                    self.assertEqual(len(doc.tables), 0)
+                    self.assertEqual(len(doc.inline_shapes), 0)
+                    anchors = doc.element.xpath("//wp:anchor")
+                    self.assertEqual(len(anchors), 1)
+                    anchor = anchors[0]
+                    for axis, inches in (("H", FRAME_X), ("V", FRAME_Y)):
+                        position = anchor.find(qn("wp:position" + axis))
+                        self.assertEqual(position.get("relativeFrom"), "page")
+                        self.assertAlmostEqual(int(position.find(qn("wp:posOffset")).text) / 914400, inches)
+                    extent = anchor.find(qn("wp:extent"))
+                    self.assertAlmostEqual(int(extent.get("cx")) / 914400, 2.7)
+                    self.assertAlmostEqual(int(extent.get("cy")) / 914400, 3.2)
+                    self.assertEqual(anchor.find(qn("wp:wrapSquare")).get("wrapText"), "left")
+                    self.assertEqual(anchor.get("distT"), "0")
+                    self.assertEqual(anchor.get("distB"), "0")
+                    outline = doc.element.xpath("//pic:spPr/a:ln")[0]
+                    self.assertEqual(int(outline.get("w")) / 12700, 1.5)
+                    self.assertEqual(outline.find(qn("a:solidFill")).find(qn("a:srgbClr")).get("val"), "141638")
+                    for item in report.opportunities:
                         for value in (item.title, item.evidence, item.recommendation):
-                            self.assertIn(value, body)
-                            self.assertNotIn(value, left)
-                    frame = doc.tables[0].cell(0, 1).tables[0]
-                    self.assertAlmostEqual(frame.columns[0].width.inches, 2.7, places=3)
-                    self.assertAlmostEqual(frame.rows[0].height.inches, 3.2, places=3)
-                    self.assertEqual(frame.rows[0].height_rule, 2)
-                    borders = frame._tbl.tblPr.find(qn("w:tblBorders"))
-                    for border in borders:
-                        self.assertEqual(border.get(qn("w:color")), "141638")
-                        self.assertEqual(border.get(qn("w:sz")), "4")
-                    self.assertEqual(frame.cell(0, 0).vertical_alignment, 1)
-                    self.assertEqual(frame.cell(0, 0).paragraphs[0].alignment, 1)
+                            self.assertIn(value, "\n".join(p.text for p in doc.paragraphs))
+                    self.assertTrue(doc.paragraphs[0]._p.xpath(".//wp:anchor"))
+                    for p in doc.paragraphs[3:]:
+                        self.assertFalse(p._p.xpath(".//wp:anchor"))
+
+    def test_image_orientation_does_not_change_opportunity_spacing_or_estimates(self):
+        for count in (2, 3, 4):
+            reports = [build_report(completed_result(count), audit_photo=photo_bytes(size)) for size in ((300, 900), (900, 300))]
+            self.assertEqual(estimate_report_height(reports[0], select_layout(reports[0])), estimate_report_height(reports[1], select_layout(reports[1])))
+            documents = [Document(BytesIO(render_docx(report))) for report in reports]
+            for first, second in zip(documents[0].paragraphs[3:], documents[1].paragraphs[3:]):
+                self.assertEqual(first.text, second.text)
+                self.assertEqual(first._p.pPr.xml, second._p.pPr.xml)
 
     def test_count_presets_change_only_spacing_and_not_with_copy_length(self):
         for count, expected in ((1, 0), (2, 1), (3, 2), (4, 3), (8, 3)):
@@ -250,16 +261,16 @@ class ShelfAuditDocxTests(unittest.TestCase):
                 data = render_docx(report)
                 self.assertIn(photo, media_bytes(data))
                 self.assertIn(DEFAULT_LOGO_PATH.read_bytes(), media_bytes(data))
-                shapes = Document(BytesIO(data)).inline_shapes
-                self.assertEqual(len(shapes), 1)
-                shape = shapes[0]
-                self.assertAlmostEqual(shape.width / shape.height, size[0] / size[1], places=5)
-                self.assertLessEqual(shape.width.inches, PHOTO_MAX_WIDTH + 0.00001)
-                self.assertLessEqual(shape.height.inches, PHOTO_MAX_HEIGHT + 0.00001)
-                previous_scale = min(3.15 / size[0], 1.4 / size[1])
-                self.assertLessEqual(shape.width.inches, photo_box_width(select_layout(report)) + 0.00001)
-                if size[1] > size[0]:
-                    self.assertGreaterEqual(shape.height.inches, size[1] * previous_scale * 1.49)
+                doc = Document(BytesIO(data))
+                extent = doc.element.xpath("//wp:anchor/wp:extent")[0]
+                fill = doc.element.xpath("//wp:anchor//a:fillRect")[0]
+                width = int(extent.get("cx")) / 914400 * (1 - (int(fill.get("l")) + int(fill.get("r"))) / 100000)
+                height = int(extent.get("cy")) / 914400 * (1 - (int(fill.get("t")) + int(fill.get("b"))) / 100000)
+                self.assertAlmostEqual(width / height, size[0] / size[1], delta=0.0002)
+                self.assertLessEqual(width, PHOTO_MAX_WIDTH + 0.0001)
+                self.assertLessEqual(height, PHOTO_MAX_HEIGHT + 0.0001)
+                self.assertEqual(fill.get("l"), fill.get("r"))
+                self.assertEqual(fill.get("t"), fill.get("b"))
 
     def test_missing_invalid_photo_and_missing_logo_degrade_gracefully(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -268,6 +279,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
                     data = render_docx(build_report(completed_result(1), audit_photo=photo), logo_path=Path(directory) / "missing.png")
                     self.assertIn("Visible evidence 0.", docx_text(data))
                     self.assertEqual(media_bytes(data), [])
+                    self.assertFalse(Document(BytesIO(data)).element.xpath("//wp:anchor"))
 
     def test_short_fixtures_fit_estimated_one_page_without_forced_breaks(self):
         for count, size in ((count, size) for count in (1, 2, 3, 4) for size in ((300, 900), (900, 300))):
