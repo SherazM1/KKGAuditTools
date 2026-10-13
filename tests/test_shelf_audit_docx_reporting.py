@@ -23,7 +23,7 @@ from shelf_audit.reporting import ReportMetadata, build_report
 from shelf_audit.reporting.docx_renderer import (
     LAYOUT_PRESETS, MIN_BODY_FONT_SIZE, PHOTO_MAX_WIDTH, PHOTO_MAX_HEIGHT,
     estimate_report_height, render_docx, select_layout,
-    photo_box_width, FRAME_WIDTH, FRAME_HEIGHT, FRAME_X, FRAME_Y,
+    photo_box_width, FRAME_WIDTH, FRAME_HEIGHT, FRAME_X, FRAME_Y, HEADER_TOP_MARGIN,
 )
 from shelf_audit.reporting.formatting import DEFAULT_LOGO_PATH
 from shelf_audit.reporting.formatting import BLUE
@@ -82,7 +82,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
                     extent = anchor.find(qn("wp:extent"))
                     self.assertAlmostEqual(int(extent.get("cx")) / 914400, 2.7)
                     self.assertAlmostEqual(int(extent.get("cy")) / 914400, 3.2)
-                    self.assertEqual((FRAME_X, FRAME_Y), (5.25, 0.65))
+                    self.assertEqual((FRAME_X, FRAME_Y), (5.60, 0.35))
                     # Include the outer half of the unchanged 1.5pt stroke.
                     half_stroke = 0.75 / 72
                     section = doc.sections[0]
@@ -113,26 +113,46 @@ class ShelfAuditDocxTests(unittest.TestCase):
                 self.assertEqual(first.text, second.text)
                 self.assertEqual(first._p.pPr.xml, second._p.pPr.xml)
 
-    def test_count_presets_change_only_spacing_and_not_with_copy_length(self):
-        for count, expected in ((1, 0), (2, 1), (3, 2), (4, 3), (8, 3)):
+    def test_count_typography_and_page_distribution_ignore_image(self):
+        for count, expected_size in ((1, 11.5), (2, 11.5), (3, 11), (4, 10.5), (8, 10)):
             report = build_report(completed_result(count))
             layout = select_layout(report)
-            self.assertEqual(layout, LAYOUT_PRESETS[expected])
+            self.assertEqual(layout.body_size, expected_size)
+            for image in (None, photo_bytes((300, 900)), photo_bytes((900, 300)), b"invalid"):
+                self.assertEqual(select_layout(build_report(completed_result(count), audit_photo=image)), layout)
             result = completed_result(count)
             result.opportunities[0].evidence = "Long unchanged wording. " * 200
-            self.assertEqual(select_layout(build_report(result)), layout)
+            long_layout = select_layout(build_report(result))
+            self.assertEqual(long_layout.body_size, layout.body_size)
+            self.assertLessEqual(long_layout.section_spacing, layout.section_spacing)
+            self.assertLessEqual(long_layout.signature_spacing, layout.signature_spacing)
         for layout in LAYOUT_PRESETS:
-            self.assertEqual(layout.body_size, 10.5)
+            self.assertGreaterEqual(layout.body_size, 10)
             self.assertEqual(layout.margin, 0.65)
-        self.assertGreater(LAYOUT_PRESETS[1].signature_spacing, LAYOUT_PRESETS[2].signature_spacing)
+        two = select_layout(build_report(completed_result(2)))
+        four = select_layout(build_report(completed_result(4)))
+        self.assertGreater(two.section_spacing, four.section_spacing + 50)
+        self.assertGreater(two.signature_spacing, four.signature_spacing + 100)
+        for count in (1, 2, 3, 4, 8):
+            report = build_report(completed_result(count))
+            doc = Document(BytesIO(render_docx(report)))
+            layout = select_layout(report)
+            for item in report.opportunities:
+                paragraph = next(p for p in doc.paragraphs if p.text == item.evidence)
+                self.assertEqual(paragraph.runs[0].font.size.pt, layout.body_size)
+            signature = next(p for p in doc.paragraphs if p.text.startswith("Signature:"))
+            self.assertAlmostEqual(signature.paragraph_format.space_before.pt, layout.signature_spacing, delta=0.03)
 
     def test_header_sizes_dividers_and_signature_only(self):
         doc = Document(BytesIO(render_docx(build_report(completed_result(3)))))
         title, subtitle = doc.sections[0].header.tables[0].cell(0, 1).paragraphs
         self.assertEqual(title.runs[0].font.size.pt, 22)
         self.assertEqual(subtitle.runs[0].font.size.pt, 11)
+        table = doc.sections[0].header.tables[0]
+        self.assertLessEqual(doc.sections[0].left_margin.inches + sum(column.width.inches for column in table.columns), FRAME_X - 0.15 + 0.001)
         logo_extent = doc.sections[0].header._element.xpath(".//wp:extent")[0]
-        self.assertAlmostEqual(int(logo_extent.get("cx")) / 914400, 0.66)
+        self.assertAlmostEqual(int(logo_extent.get("cx")) / 914400, 0.88)
+        self.assertIn(DEFAULT_LOGO_PATH.read_bytes(), media_bytes(render_docx(build_report(completed_result(3)))))
         headings = [p for p in doc.paragraphs if p.text.startswith(("01  ", "02  ", "03  "))]
         self.assertIsNone(headings[0]._p.pPr.find(qn("w:pBdr")))
         for heading in headings[1:]:
@@ -295,7 +315,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
             with self.subTest(count=count, size=size):
                 report = build_report(completed_result(count), audit_photo=photo_bytes(size))
                 layout = select_layout(report)
-                available = (11 - 1.25 - layout.margin) * 72 - 24
+                available = (11 - HEADER_TOP_MARGIN - layout.margin) * 72 - 24
                 self.assertLessEqual(estimate_report_height(report, layout), available)
                 doc = Document(BytesIO(render_docx(report)))
                 self.assertFalse(doc.element.xpath('//w:br[@w:type="page"]'))
@@ -315,7 +335,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
             item.evidence = f"Long test section {index}. " * 100
         report = build_report(result, audit_photo=photo_bytes())
         layout = select_layout(report)
-        self.assertGreater(estimate_report_height(report, layout), (11 - 1.25 - layout.margin) * 72)
+        self.assertGreater(estimate_report_height(report, layout), (11 - HEADER_TOP_MARGIN - layout.margin) * 72)
         data = render_docx(report)
         text = docx_text(data)
         for item in report.opportunities:

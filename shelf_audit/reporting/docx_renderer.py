@@ -1,6 +1,6 @@
 """Editable Word reports from final report data; no audit or Office dependency."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -29,10 +29,11 @@ MIN_BODY_FONT_SIZE = 10.0
 BOOK_FONT = "Gotham-Book"
 MEDIUM_FONT = "Gotham-Medium"
 BOLD_FONT = "Gotham-Bold"
-FRAME_X = 5.25  # Page-relative inches; frame ends at 7.95 on an 8.5-inch page.
-FRAME_Y = 0.65
+FRAME_X = 5.60  # Page-relative inches; frame ends at 8.30 on an 8.5-inch page.
+FRAME_Y = 0.35
 FRAME_BORDER_PT = 1.5
 TEXT_CLEARANCE = 0.15
+HEADER_TOP_MARGIN = 1.5
 
 
 @dataclass(frozen=True)
@@ -47,12 +48,13 @@ class DocxLayout:
     margin: float = 0.65
 
 
-# Count changes spacing only; typography, frame, and page architecture stay fixed.
+# Count controls body readability and base spacing; the architecture stays fixed.
 LAYOUT_PRESETS = (
-    DocxLayout(section_spacing=18, body_spacing=6, content_spacing=10, signature_spacing=28),
-    DocxLayout(section_spacing=14, body_spacing=5, content_spacing=8, signature_spacing=24),
-    DocxLayout(),
+    DocxLayout(section_spacing=18, body_spacing=6, content_spacing=10, signature_spacing=28, body_size=11.5),
+    DocxLayout(section_spacing=14, body_spacing=5, content_spacing=8, signature_spacing=24, body_size=11.5),
+    DocxLayout(body_size=11),
     DocxLayout(section_spacing=5, body_spacing=2, content_spacing=4, signature_spacing=8),
+    DocxLayout(section_spacing=5, body_spacing=2, content_spacing=4, signature_spacing=8, body_size=10),
 )
 
 
@@ -117,7 +119,7 @@ def estimate_report_height(report: ShelfOpportunityReport, layout: DocxLayout) -
     """Estimate the fixed composition; never use this to choose a structure."""
     width = (8.5 - 2 * layout.margin) * 72
     has_photo = photo_size(report, layout) is not None
-    text_width = width - (FRAME_WIDTH + TEXT_CLEARANCE) * 72 if has_photo else width
+    text_width = (FRAME_X - TEXT_CLEARANCE - layout.margin) * 72 if has_photo else width
     # Conservatively measure text at the upper-region width. Word releases the
     # width below the frame via native square wrapping. No image height or image
     # row is counted, so portrait/landscape cannot alter vertical spacing.
@@ -130,8 +132,32 @@ def estimate_report_height(report: ShelfOpportunityReport, layout: DocxLayout) -
 
 
 def select_layout(report: ShelfOpportunityReport) -> DocxLayout:
-    """Spacing depends only on finding count, never photo shape or copy length."""
-    return LAYOUT_PRESETS[min(max(len(report.opportunities), 1), 4) - 1]
+    """Distribute spare page height without any image-dependent calculation.
+
+    Count chooses body size and base gaps. Conservative text measurements only
+    limit extra spacing for long copy; they never move content or change layout.
+    """
+    count = len(report.opportunities)
+    base = LAYOUT_PRESETS[min(max(count, 1), 5) - 1]
+    if count == 0 or count >= 4:
+        return base
+    # Measure the narrow upper text region even with no photo, ensuring image
+    # presence, dimensions, and frame height cannot participate in distribution.
+    text_width = (FRAME_X - TEXT_CLEARANCE - base.margin) * 72
+    natural_height = (
+        _metadata_height(report, base, text_width) + base.content_spacing
+        + sum(_opportunity_height(item, base, text_width) for item in report.opportunities)
+        + base.signature_spacing + 48
+    )
+    available = (11 - HEADER_TOP_MARGIN - base.margin) * 72 - 40
+    extra = max(0, min((320, 280, 140)[count - 1], available - natural_height))
+    # Balanced rather than equal gaps: 55% between/before blocks, 45% before
+    # signature. Everything remains paragraph spacing in ordinary Word flow.
+    return replace(
+        base,
+        section_spacing=round(base.section_spacing + extra * 0.55 / count, 2),
+        signature_spacing=round(base.signature_spacing + extra * 0.45, 2),
+    )
 
 
 def _rule(paragraph: Paragraph) -> None:
@@ -216,7 +242,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
     document = Document()
     section = document.sections[0]
     section.page_width, section.page_height = Inches(8.5), Inches(11)
-    section.top_margin, section.bottom_margin = Inches(1.25), Inches(layout.margin)
+    section.top_margin, section.bottom_margin = Inches(HEADER_TOP_MARGIN), Inches(layout.margin)
     section.left_margin = section.right_margin = Inches(layout.margin)
     section.header_distance = section.footer_distance = Inches(0.3)
     width = 8.5 - 2 * layout.margin
@@ -249,18 +275,19 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
     header.paragraphs[0].paragraph_format.space_after = Pt(0)
     header.paragraphs[0].paragraph_format.line_spacing = Pt(1)
     header.paragraphs[0].paragraph_format.space_before = Pt(0)
-    header_table = header.add_table(rows=1, cols=2, width=Inches(width))
+    header_width = FRAME_X - layout.margin - TEXT_CLEARANCE
+    header_table = header.add_table(rows=1, cols=2, width=Inches(header_width))
     header_table.autofit = False
-    header_table.columns[0].width = Inches(0.9)
-    header_table.columns[1].width = Inches(width - 0.9)
+    header_table.columns[0].width = Inches(1.1)
+    header_table.columns[1].width = Inches(header_width - 1.1)
     logo_cell, identity_cell = header_table.rows[0].cells
-    logo_cell.width = Inches(0.9)
-    identity_cell.width = Inches(width - 0.9)
+    logo_cell.width = Inches(1.1)
+    identity_cell.width = Inches(header_width - 1.1)
     for cell in (logo_cell, identity_cell):
         cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
     logo = load_logo(logo_path)
     if logo:
-        logo_cell.paragraphs[0].add_run().add_picture(BytesIO(logo), width=Inches(0.66))
+        logo_cell.paragraphs[0].add_run().add_picture(BytesIO(logo), width=Inches(0.88))
     title = identity_cell.paragraphs[0]
     title.add_run(report.title)
     format_paragraph(title, size=22, font=BOLD_FONT, after=2)
@@ -302,7 +329,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         # Stable first metadata paragraph owns one page-relative anchor. It has
         # no inline extent, table, or frame-height spacer in the body flow.
         _add_audit_anchor(document.paragraphs[0], report.audit_photo, size)
-    text_width = width - FRAME_WIDTH - TEXT_CLEARANCE if size else width
+    text_width = FRAME_X - TEXT_CLEARANCE - layout.margin if size else width
     for item in report.opportunities:
         add_opportunity(document, item, text_width)
     if not report.opportunities:
