@@ -1,6 +1,7 @@
 """Editable Word reports from final report data; no audit or Office dependency."""
 
 from dataclasses import dataclass, replace
+from copy import deepcopy
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -10,7 +11,7 @@ from zoneinfo import ZoneInfo
 from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml import OxmlElement
+from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 from docx.text.paragraph import Paragraph
@@ -160,9 +161,9 @@ def select_layout(report: ShelfOpportunityReport) -> DocxLayout:
     )
 
 
-def _rule(paragraph: Paragraph) -> None:
+def _rule(paragraph: Paragraph, edge: str = "top") -> None:
     borders = OxmlElement("w:pBdr")
-    border = OxmlElement("w:top")
+    border = OxmlElement(f"w:{edge}")
     for key, value in (("val", "single"), ("sz", "4"), ("space", "6"), ("color", NAVY.lstrip("#"))):
         border.set(qn(f"w:{key}"), value)
     borders.append(border)
@@ -232,6 +233,44 @@ def _add_audit_anchor(paragraph: Paragraph, data: bytes, size: tuple[float, floa
     inline.getparent().replace(inline, anchor)
 
 
+def _add_image_caption(paragraph: Paragraph) -> None:
+    """A separate page-relative text shape; no paragraph/spacer in body flow."""
+    anchor = deepcopy(paragraph._p.xpath(".//wp:anchor")[-1])
+    height = Inches(0.22)
+    anchor.find(qn("wp:extent")).set("cy", str(int(height)))
+    anchor.find(qn("wp:positionV")).find(qn("wp:posOffset")).text = str(int(Inches(FRAME_Y + FRAME_HEIGHT + 0.07)))
+    properties = anchor.find(qn("wp:docPr"))
+    properties.set("id", str(paragraph.part.next_id))
+    properties.set("name", "Audit reference image caption")
+    anchor.remove(anchor.find(qn("a:graphic")))
+    graphic = parse_xml('''<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+        xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+        xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+        <wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln>
+        </wps:spPr><wps:txbx><w:txbxContent><w:p/></w:txbxContent></wps:txbx>
+        <wps:bodyPr lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr"/>
+        </wps:wsp>
+      </a:graphicData></a:graphic>''')
+    extent = graphic.find(".//" + qn("a:ext"))
+    extent.set("cx", str(int(Inches(FRAME_WIDTH))))
+    extent.set("cy", str(int(height)))
+    text_paragraph = Paragraph(graphic.find(".//" + qn("w:p")), paragraph._parent)
+    text_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    text_paragraph.paragraph_format.space_before = text_paragraph.paragraph_format.space_after = Pt(0)
+    text_paragraph.paragraph_format.line_spacing = 1.0
+    run = text_paragraph.add_run("AUDIT REFERENCE IMAGE")
+    _set_font(run, BOLD_FONT)
+    run.font.size = Pt(8)
+    run.font.color.rgb = RGBColor.from_string(NAVY.lstrip("#"))
+    anchor.append(graphic)
+    drawing = OxmlElement("w:drawing")
+    drawing.append(anchor)
+    paragraph.add_run()._r.append(drawing)
+
+
 def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFAULT_LOGO_PATH) -> bytes:
     """Render editable paragraphs and original image bytes without modifying data.
 
@@ -293,7 +332,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
     format_paragraph(title, size=22, font=BOLD_FONT, after=2)
     if report.subtitle:
         subtitle = identity_cell.add_paragraph(report.subtitle.upper())
-        format_paragraph(subtitle, size=11, font=MEDIUM_FONT, blue=True, after=0)
+        format_paragraph(subtitle, size=11, font=BOLD_FONT, blue=True, after=0)
 
     def add_opportunity(container, item: ReportOpportunity, text_width: float) -> None:
         # Use exactly the same finding style inside the cell and at full width.
@@ -302,16 +341,22 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         heading.add_run(f"{item.number:02d}  ")
         heading.add_run(item.title)
         format_paragraph(heading, size=layout.title_size, font=BOLD_FONT, before=layout.section_spacing, after=4, keep_next=True)
-        if item.number > 1:
+        right_indent = Inches(width - text_width) if size and item.number == 1 else Inches(0)
+        heading.paragraph_format.right_indent = right_indent
+        if item.number > 2:
             _rule(heading)
         for label, text, last in (
             (WHY_LABEL, item.evidence, False),
             (RECOMMENDATION_LABEL, item.recommendation, True),
         ):
             paragraph = container.add_paragraph(label.upper())
-            format_paragraph(paragraph, size=9, font=MEDIUM_FONT, blue=True, after=1, keep_next=True)
+            format_paragraph(paragraph, size=9, font=BOLD_FONT, blue=True, after=1, keep_next=True)
+            paragraph.paragraph_format.right_indent = right_indent
             paragraph = container.add_paragraph(text)
             format_paragraph(paragraph, after=layout.body_spacing, keep_next=short_section and not last, keep_lines=short_section)
+            paragraph.paragraph_format.right_indent = right_indent
+            if item.number == 1 and last:
+                _rule(paragraph, "bottom")
 
     # Metadata always precedes the main copy/photo region, at full usable width.
     for label, value in (
@@ -329,6 +374,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         # Stable first metadata paragraph owns one page-relative anchor. It has
         # no inline extent, table, or frame-height spacer in the body flow.
         _add_audit_anchor(document.paragraphs[0], report.audit_photo, size)
+        _add_image_caption(document.paragraphs[0])
     text_width = FRAME_X - TEXT_CLEARANCE - layout.margin if size else width
     for item in report.opportunities:
         add_opportunity(document, item, text_width)
@@ -341,7 +387,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         paragraph.add_run(f"{label}:")
         paragraph.add_run("  " + ("______________________________" if index == 0 else "__________________"))
         format_paragraph(paragraph, after=8, before=layout.signature_spacing if index == 0 else 0, keep_next=index < 1, keep_lines=True)
-        _set_font(paragraph.runs[0], MEDIUM_FONT)
+        _set_font(paragraph.runs[0], BOLD_FONT)
         if index == 0:
             _rule(paragraph)
     footer = section.footer.paragraphs[0]
