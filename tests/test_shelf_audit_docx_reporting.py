@@ -22,8 +22,8 @@ from streamlit.testing.v1 import AppTest
 from shelf_audit.reporting import ReportMetadata, build_report
 from shelf_audit.reporting.docx_renderer import (
     LAYOUT_PRESETS, MIN_BODY_FONT_SIZE, PHOTO_MAX_WIDTH, PHOTO_MAX_HEIGHT,
-    estimate_report_height, render_docx, select_layout, first_opportunity_fits,
-    photo_box_width, TOP_LEFT_FRACTION,
+    estimate_report_height, render_docx, select_layout, opportunities_beside_photo,
+    photo_box_width, TOP_LEFT_FRACTION, photo_size,
 )
 from shelf_audit.reporting.formatting import DEFAULT_LOGO_PATH
 from shelf_audit.reporting.formatting import BLUE
@@ -64,12 +64,60 @@ def media_bytes(data):
 
 
 class ShelfAuditDocxTests(unittest.TestCase):
+    def test_only_whole_additional_findings_fit_beside_actual_photo_height(self):
+        result = completed_result(4)
+        report = build_report(result, audit_photo=photo_bytes((300, 900)))
+        self.assertEqual(opportunities_beside_photo(report, select_layout(report)), 2)
+        result.opportunities[1].evidence = "Long second finding stays full width. " * 30
+        report = build_report(result, audit_photo=photo_bytes((300, 900)))
+        self.assertEqual(opportunities_beside_photo(report, select_layout(report)), 1)
+        doc = Document(BytesIO(render_docx(report)))
+        left = "\n".join(p.text for p in doc.tables[0].cell(0, 0).paragraphs)
+        body = "\n".join(p.text for p in doc.paragraphs)
+        for item in report.opportunities[1:]:
+            for value in (item.title, item.evidence, item.recommendation):
+                self.assertNotIn(value, left)
+                self.assertIn(value, body)
+        text = docx_text(render_docx(report))
+        for item in report.opportunities:
+            for value in (item.title, item.evidence, item.recommendation):
+                self.assertEqual(text.count(value), 1)
+
+    def test_very_long_first_finding_stays_in_cell_and_can_paginate(self):
+        result = completed_result(2)
+        result.opportunities[0].evidence = "\n".join(f"Complete long evidence line {index}." for index in range(150))
+        report = build_report(result, audit_photo=photo_bytes())
+        self.assertEqual(opportunities_beside_photo(report, select_layout(report)), 1)
+        data = render_docx(report)
+        doc = Document(BytesIO(data))
+        row = doc.tables[0].rows[0]
+        self.assertFalse(row._tr.xpath("w:trPr/w:cantSplit"))
+        left = "\n".join(p.text for p in row.cells[0].paragraphs)
+        self.assertIn(report.opportunities[0].evidence, left)
+        self.assertIn(report.opportunities[0].recommendation, left)
+        self.assertIn(report.opportunities[1].evidence, "\n".join(p.text for p in doc.paragraphs))
+        self.assertEqual(len(doc.inline_shapes), 1)
+        self.assertFalse(doc.element.xpath("//wp:anchor"))
+
+    def test_portrait_reference_panel_is_larger_than_previous_corner_image(self):
+        report = build_report(completed_result(3), audit_photo=photo_bytes((300, 900)))
+        layout = select_layout(report)
+        size = photo_size(report, layout)
+        self.assertAlmostEqual(size[1], 3.6)
+        self.assertGreater(size[1], 2.1 * 1.5)
+        self.assertGreater(size[0], (2.1 / 3) * 1.5)
+        doc = Document(BytesIO(render_docx(report)))
+        body_elements = list(doc.iter_inner_content())
+        self.assertTrue(all(isinstance(block, Paragraph) for block in body_elements[:3]))
+        self.assertEqual(body_elements[3]._tbl, doc.tables[0]._tbl)
+
     def test_short_first_finding_is_complete_in_borderless_top_table(self):
         for count in (1, 2, 3):
             with self.subTest(count=count):
                 report = build_report(completed_result(count), audit_photo=photo_bytes((300, 900)))
                 layout = select_layout(report)
-                self.assertTrue(first_opportunity_fits(report, layout))
+                beside_count = opportunities_beside_photo(report, layout)
+                self.assertGreaterEqual(beside_count, 1)
                 doc = Document(BytesIO(render_docx(report)))
                 table = doc.tables[0]
                 left_text = "\n".join(p.text for p in table.cell(0, 0).paragraphs)
@@ -78,13 +126,19 @@ class ShelfAuditDocxTests(unittest.TestCase):
                 for value in (first.title, first.evidence, first.recommendation):
                     self.assertIn(value, left_text)
                     self.assertNotIn(value, body_text)
-                for item in report.opportunities[1:]:
+                for item in report.opportunities[1:beside_count]:
+                    for value in (item.title, item.evidence, item.recommendation):
+                        self.assertIn(value, left_text)
+                        self.assertNotIn(value, body_text)
+                for item in report.opportunities[beside_count:]:
                     for value in (item.title, item.evidence, item.recommendation):
                         self.assertIn(value, body_text)
                         self.assertNotIn(value, left_text)
                 # Word stores widths in whole twips, so allow sub-twip rounding.
-                self.assertAlmostEqual(table.columns[0].width / sum(c.width for c in table.columns), 0.60, places=4)
-                self.assertEqual(TOP_LEFT_FRACTION, 0.60)
+                self.assertAlmostEqual(table.columns[0].width / sum(c.width for c in table.columns), 0.65, places=4)
+                self.assertEqual(TOP_LEFT_FRACTION, 0.65)
+                self.assertEqual([p.text for p in doc.paragraphs[:3]], ["Client: ", "Retailer: ", "Location: "])
+                self.assertNotIn("Client:", left_text)
                 borders = table._tbl.tblPr.find(qn("w:tblBorders"))
                 self.assertEqual(len(borders), 6)
                 self.assertTrue(all(border.get(qn("w:val")) == "nil" for border in borders))
@@ -97,7 +151,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
                 for value in (first.evidence, first.recommendation):
                     self.assertEqual(next(p for p in paragraphs if p.text == value).runs[0].font.name, "Gotham-Book")
 
-    def test_long_first_finding_and_long_metadata_choose_full_width(self):
+    def test_long_first_finding_always_stays_in_left_column(self):
         for long_metadata in (False, True):
             with self.subTest(long_metadata=long_metadata):
                 result = completed_result(2)
@@ -107,11 +161,15 @@ class ShelfAuditDocxTests(unittest.TestCase):
                 else:
                     result.opportunities[0].evidence = "Long synthetic evidence " * 30
                 report = build_report(result, metadata=metadata, audit_photo=photo_bytes())
-                self.assertFalse(first_opportunity_fits(report, select_layout(report)))
+                self.assertEqual(opportunities_beside_photo(report, select_layout(report)), 1)
                 doc = Document(BytesIO(render_docx(report)))
-                self.assertEqual(len(doc.tables[0].cell(0, 0).paragraphs), 3)
+                left = "\n".join(p.text for p in doc.tables[0].cell(0, 0).paragraphs)
                 body = "\n".join(p.text for p in doc.paragraphs)
-                for item in report.opportunities:
+                for value in (report.opportunities[0].title, report.opportunities[0].evidence, report.opportunities[0].recommendation):
+                    self.assertIn(value, left)
+                    self.assertNotIn(value, body)
+                self.assertNotIn("Client:", left)
+                for item in report.opportunities[1:]:
                     for value in (item.title, item.evidence, item.recommendation):
                         self.assertIn(value, body)
 
@@ -119,7 +177,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
         for photo in (None, b"invalid photo"):
             with self.subTest(photo=photo):
                 report = build_report(completed_result(1), audit_photo=photo)
-                self.assertFalse(first_opportunity_fits(report, select_layout(report)))
+                self.assertEqual(opportunities_beside_photo(report, select_layout(report)), 0)
                 doc = Document(BytesIO(render_docx(report)))
                 self.assertEqual(len(doc.tables), 0)
                 self.assertEqual([p.text for p in doc.paragraphs[:3]], ["Client: ", "Retailer: ", "Location: "])
