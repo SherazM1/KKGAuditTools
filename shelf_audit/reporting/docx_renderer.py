@@ -8,7 +8,7 @@ import textwrap
 from zoneinfo import ZoneInfo
 
 from docx import Document
-from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
+from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT, WD_ROW_HEIGHT_RULE
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -21,33 +21,36 @@ from .formatting import BLUE, NAVY, DEFAULT_LOGO_PATH, load_logo
 from .models import ReportOpportunity, ShelfOpportunityReport
 from .templates import NO_OPPORTUNITIES_TEXT, WHY_LABEL, RECOMMENDATION_LABEL
 
-PHOTO_MAX_WIDTH = 4.75  # Inches; the same fixed box is used for both orientations.
-PHOTO_MAX_HEIGHT = 3.6
+FRAME_WIDTH = 2.7
+FRAME_HEIGHT = 3.2
+PHOTO_MAX_WIDTH = FRAME_WIDTH - 0.12
+PHOTO_MAX_HEIGHT = FRAME_HEIGHT - 0.25
 MIN_BODY_FONT_SIZE = 10.0
 BOOK_FONT = "Gotham-Book"
 MEDIUM_FONT = "Gotham-Medium"
 BOLD_FONT = "Gotham-Bold"
-TOP_LEFT_FRACTION = 0.65
+PHOTO_COLUMN_WIDTH = 2.8
 CELL_PADDING = 0.08  # Combined horizontal cell padding, in inches.
 
 
 @dataclass(frozen=True)
 class DocxLayout:
-    section_spacing: float = 10
-    metadata_spacing: float = 4
+    section_spacing: float = 8
+    body_spacing: float = 3
+    content_spacing: float = 6
+    signature_spacing: float = 14
+    metadata_spacing: float = 2
     title_size: float = 12
-    body_size: float = 11
-    margin: float = 0.7
+    body_size: float = 10.5
+    margin: float = 0.65
 
 
-# Tune spacing first, then headings/body, then margins. Never shrink below 10pt.
+# Count changes spacing only; typography, frame, and page architecture stay fixed.
 LAYOUT_PRESETS = (
+    DocxLayout(section_spacing=18, body_spacing=6, content_spacing=10, signature_spacing=28),
+    DocxLayout(section_spacing=14, body_spacing=5, content_spacing=8, signature_spacing=24),
     DocxLayout(),
-    DocxLayout(section_spacing=5),
-    DocxLayout(section_spacing=5, metadata_spacing=1),
-    DocxLayout(section_spacing=5, metadata_spacing=1, title_size=11),
-    DocxLayout(section_spacing=5, metadata_spacing=1, title_size=11, body_size=10),
-    DocxLayout(section_spacing=5, metadata_spacing=1, title_size=11, body_size=10, margin=0.55),
+    DocxLayout(section_spacing=5, body_spacing=2, content_spacing=4, signature_spacing=8),
 )
 
 
@@ -75,7 +78,7 @@ def _line_count(text: str, width_points: float, font_size: float) -> int:
 
 def photo_box_width(layout: DocxLayout) -> float:
     """Limit the original photo to the usable right-cell width, in inches."""
-    return min(PHOTO_MAX_WIDTH, (8.5 - 2 * layout.margin) * (1 - TOP_LEFT_FRACTION) - CELL_PADDING)
+    return PHOTO_MAX_WIDTH
 
 
 def _metadata_height(report: ShelfOpportunityReport, layout: DocxLayout, width: float) -> float:
@@ -94,7 +97,7 @@ def _opportunity_height(item: ReportOpportunity, layout: DocxLayout, width: floa
         _line_count(f"{item.number:02d}  {item.title}", width, layout.title_size) * layout.title_size * 1.12
         + 2 * 11
         + sum(_line_count(value, width, layout.body_size) * layout.body_size * 1.12 for value in (item.evidence, item.recommendation))
-        + layout.section_spacing + 12
+        + layout.section_spacing + 6 + 2 * layout.body_spacing
     )
 
 
@@ -108,60 +111,30 @@ def photo_size(report: ShelfOpportunityReport, layout: DocxLayout) -> tuple[floa
     return image_width * scale, image_height * scale
 
 
-def opportunities_beside_photo(report: ShelfOpportunityReport, layout: DocxLayout) -> int:
-    """Always place the whole first finding left; add only whole findings that fit.
-
-    Subsequent findings use a conservative height estimate against the actual
-    image height. A long first finding stays left even when taller than the image.
-    """
-    size = photo_size(report, layout)
-    if not report.opportunities or size is None:
-        return 0
-    width = ((8.5 - 2 * layout.margin) * TOP_LEFT_FRACTION - CELL_PADDING) * 72
-    height = _opportunity_height(report.opportunities[0], layout, width)
-    count = 1
-    for item in report.opportunities[1:]:
-        candidate_height = _opportunity_height(item, layout, width)
-        if height + candidate_height + 6 > size[1] * 72:
-            break
-        height += candidate_height
-        count += 1
-    return count
-
-
 def estimate_report_height(report: ShelfOpportunityReport, layout: DocxLayout) -> float:
-    """Approximate consistent body height, including reserved approval space."""
+    """Estimate the fixed composition; never use this to choose a structure."""
     width = (8.5 - 2 * layout.margin) * 72
-    size = photo_size(report, layout)
-    count = opportunities_beside_photo(report, layout)
-    left_width = width * TOP_LEFT_FRACTION - CELL_PADDING * 72
-    copy_height = sum(_opportunity_height(item, layout, left_width) for item in report.opportunities[:count])
-    photo_height = size[1] * 72 + 6 if size else 0
-    height = _metadata_height(report, layout, width) + max(copy_height, photo_height) + 12 + 78
-    if not report.opportunities:
-        return height + _line_count(NO_OPPORTUNITIES_TEXT, width, layout.body_size) * layout.body_size * 1.12
-    for item in report.opportunities[count:]:
+    has_photo = photo_size(report, layout) is not None
+    left_width = width - (PHOTO_COLUMN_WIDTH + CELL_PADDING) * 72
+    first_height = _opportunity_height(report.opportunities[0], layout, left_width) if report.opportunities else 24
+    height = _metadata_height(report, layout, width) + layout.content_spacing
+    height += max(first_height, FRAME_HEIGHT * 72 + 6) if has_photo else 0
+    for item in report.opportunities[1 if has_photo else 0:]:
         height += _opportunity_height(item, layout, width)
-    return height
+    if not report.opportunities and not has_photo:
+        height += 24
+    return height + layout.signature_spacing + 48
 
 
 def select_layout(report: ShelfOpportunityReport) -> DocxLayout:
-    """Aim for one page for 0–4 findings; allow longer reports to flow normally."""
-    if len(report.opportunities) > 4:
-        return LAYOUT_PRESETS[1]
-    for layout in LAYOUT_PRESETS:
-        # Header is in the top margin. Include safety slack for Word table/line
-        # metrics; actual page count depends on fonts and the receiving viewer.
-        available = (11 - 1.15 - layout.margin) * 72 - 24
-        if estimate_report_height(report, layout) <= available:
-            return layout
-    return LAYOUT_PRESETS[-1]
+    """Spacing depends only on finding count, never photo shape or copy length."""
+    return LAYOUT_PRESETS[min(max(len(report.opportunities), 1), 4) - 1]
 
 
 def _rule(paragraph: Paragraph) -> None:
     borders = OxmlElement("w:pBdr")
     border = OxmlElement("w:top")
-    for key, value in (("val", "single"), ("sz", "4"), ("space", "6"), ("color", "DCE1EA")):
+    for key, value in (("val", "single"), ("sz", "4"), ("space", "6"), ("color", NAVY.lstrip("#"))):
         border.set(qn(f"w:{key}"), value)
     borders.append(border)
     paragraph._p.get_or_add_pPr().append(borders)
@@ -186,7 +159,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
     document = Document()
     section = document.sections[0]
     section.page_width, section.page_height = Inches(8.5), Inches(11)
-    section.top_margin, section.bottom_margin = Inches(1.15), Inches(layout.margin)
+    section.top_margin, section.bottom_margin = Inches(1.25), Inches(layout.margin)
     section.left_margin = section.right_margin = Inches(layout.margin)
     section.header_distance = section.footer_distance = Inches(0.3)
     width = 8.5 - 2 * layout.margin
@@ -230,13 +203,13 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
     logo = load_logo(logo_path)
     if logo:
-        logo_cell.paragraphs[0].add_run().add_picture(BytesIO(logo), width=Inches(0.55))
+        logo_cell.paragraphs[0].add_run().add_picture(BytesIO(logo), width=Inches(0.66))
     title = identity_cell.paragraphs[0]
     title.add_run(report.title)
-    format_paragraph(title, size=19, font=BOLD_FONT, after=2)
+    format_paragraph(title, size=22, font=BOLD_FONT, after=2)
     if report.subtitle:
         subtitle = identity_cell.add_paragraph(report.subtitle.upper())
-        format_paragraph(subtitle, size=10, font=MEDIUM_FONT, blue=True, after=0)
+        format_paragraph(subtitle, size=11, font=MEDIUM_FONT, blue=True, after=0)
 
     def add_opportunity(container, item: ReportOpportunity, text_width: float) -> None:
         # Use exactly the same finding style inside the cell and at full width.
@@ -245,7 +218,8 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         heading.add_run(f"{item.number:02d}  ")
         heading.add_run(item.title)
         format_paragraph(heading, size=layout.title_size, font=BOLD_FONT, before=layout.section_spacing, after=4, keep_next=True)
-        _rule(heading)
+        if item.number > 1:
+            _rule(heading)
         for label, text, last in (
             (WHY_LABEL, item.evidence, False),
             (RECOMMENDATION_LABEL, item.recommendation, True),
@@ -253,7 +227,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
             paragraph = container.add_paragraph(label.upper())
             format_paragraph(paragraph, size=9, font=MEDIUM_FONT, blue=True, after=1, keep_next=True)
             paragraph = container.add_paragraph(text)
-            format_paragraph(paragraph, after=3, keep_next=short_section and not last, keep_lines=short_section)
+            format_paragraph(paragraph, after=layout.body_spacing, keep_next=short_section and not last, keep_lines=short_section)
 
     # Metadata always precedes the main copy/photo region, at full usable width.
     for label, value in (
@@ -264,15 +238,16 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         _set_font(paragraph.add_run(f"{label}: "), MEDIUM_FONT)
         _set_font(paragraph.add_run(value or ""), BOOK_FONT)
         paragraph.paragraph_format.space_after = Pt(layout.metadata_spacing)
+    paragraph.paragraph_format.space_after = Pt(layout.metadata_spacing + layout.content_spacing)
 
     size = photo_size(report, layout)
-    beside_count = opportunities_beside_photo(report, layout)
+    beside_count = 1 if size and report.opportunities else 0
     if size:
         top_table = document.add_table(rows=1, cols=2)
         top_table.alignment = WD_TABLE_ALIGNMENT.CENTER
         top_table.autofit = False
         copy_cell, photo_cell = top_table.rows[0].cells
-        for column, cell, fraction in zip(top_table.columns, (copy_cell, photo_cell), (TOP_LEFT_FRACTION, 1 - TOP_LEFT_FRACTION)):
+        for column, cell, fraction in zip(top_table.columns, (copy_cell, photo_cell), ((width - PHOTO_COLUMN_WIDTH) / width, PHOTO_COLUMN_WIDTH / width)):
             column.width = cell.width = Inches(width * fraction)
             cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
             margins = OxmlElement("w:tcMar")
@@ -289,29 +264,54 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
             border.set(qn("w:val"), "nil")
             borders.append(border)
         top_table._tbl.tblPr.append(borders)
-        # Keep compact rows together; allow exceptionally long first findings
-        # to paginate within the same left cell without losing any copy.
-        left_width = (width * TOP_LEFT_FRACTION - CELL_PADDING) * 72
-        row_height = max(sum(_opportunity_height(item, layout, left_width) for item in report.opportunities[:beside_count]), size[1] * 72 + 6)
-        if row_height + _metadata_height(report, layout, width * 72) + 12 < (11 - 1.15 - layout.margin) * 72 - 24:
-            top_table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        # Permit ordinary Word pagination for long copy; no forced row heights
+        # or whole-row keep rules on the recommendation cell.
         copy_cell.paragraphs[0].paragraph_format.line_spacing = Pt(1)
         copy_cell.paragraphs[0].paragraph_format.space_after = Pt(0)
         for item in report.opportunities[:beside_count]:
-            add_opportunity(copy_cell, item, width * TOP_LEFT_FRACTION - CELL_PADDING)
+            add_opportunity(copy_cell, item, width - PHOTO_COLUMN_WIDTH - CELL_PADDING)
         if not report.opportunities:
             copy_cell.paragraphs[0].add_run(NO_OPPORTUNITIES_TEXT)
             format_paragraph(copy_cell.paragraphs[0])
             copy_cell.paragraphs[0].paragraph_format.line_spacing = 1.12
-        paragraph = photo_cell.paragraphs[0]
-        paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        paragraph.add_run().add_picture(
-            BytesIO(report.audit_photo), width=Inches(size[0]),
-            height=Inches(size[1]),
-        )
+        # The nested table supplies a fixed frame without floating objects.
+        photo_cell.paragraphs[0].paragraph_format.line_spacing = Pt(1)
+        photo_cell.paragraphs[0].paragraph_format.space_after = Pt(0)
+        frame = photo_cell.add_table(rows=1, cols=1)
+        frame.autofit = False
+        frame.alignment = WD_TABLE_ALIGNMENT.RIGHT
+        frame.columns[0].width = frame.cell(0, 0).width = Inches(FRAME_WIDTH)
+        frame.rows[0].height = Inches(FRAME_HEIGHT)
+        frame.rows[0].height_rule = WD_ROW_HEIGHT_RULE.EXACTLY
+        frame.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        frame_cell = frame.cell(0, 0)
+        frame_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        padding = OxmlElement("w:tcMar")
+        for edge, inches in (("left", 0.06), ("right", 0.06), ("top", 0.05), ("bottom", 0.05)):
+            margin = OxmlElement(f"w:{edge}")
+            margin.set(qn("w:w"), str(int(inches * 1440)))
+            margin.set(qn("w:type"), "dxa")
+            padding.append(margin)
+        frame_cell._tc.get_or_add_tcPr().append(padding)
+        borders = OxmlElement("w:tblBorders")
+        for edge in ("top", "left", "bottom", "right"):
+            border = OxmlElement(f"w:{edge}")
+            for key, value in (("val", "single"), ("sz", "4"), ("color", NAVY.lstrip("#"))):
+                border.set(qn(f"w:{key}"), value)
+            borders.append(border)
+        frame._tbl.tblPr.append(borders)
+        paragraph = frame_cell.paragraphs[0]
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.paragraph_format.space_before = paragraph.paragraph_format.space_after = Pt(0)
+        paragraph.paragraph_format.line_spacing = 1.0
+        run = paragraph.add_run()
+        run.font.size = Pt(1)
+        run.add_picture(BytesIO(report.audit_photo), width=Inches(size[0]), height=Inches(size[1]))
+        photo_cell.paragraphs[-1].paragraph_format.line_spacing = Pt(1)
+        photo_cell.paragraphs[-1].paragraph_format.space_after = Pt(0)
     spacer = document.add_paragraph()
     spacer.paragraph_format.space_after = Pt(0)
-    spacer.paragraph_format.line_spacing = Pt(4)
+    spacer.paragraph_format.line_spacing = Pt(1)
 
     for item in report.opportunities[beside_count:]:
         add_opportunity(document, item, width)
@@ -319,11 +319,11 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         document.add_paragraph(NO_OPPORTUNITIES_TEXT)
 
     # These are ordinary editable paragraphs, not image-based signature artwork.
-    for index, label in enumerate(("Approved By", "Signature", "Date")):
+    for index, label in enumerate(("Signature", "Date")):
         paragraph = document.add_paragraph()
         paragraph.add_run(f"{label}:")
-        paragraph.add_run("  ______________________________")
-        format_paragraph(paragraph, after=8, before=12 if index == 0 else 0, keep_next=index < 2, keep_lines=True)
+        paragraph.add_run("  " + ("______________________________" if index == 0 else "__________________"))
+        format_paragraph(paragraph, after=8, before=layout.signature_spacing if index == 0 else 0, keep_next=index < 1, keep_lines=True)
         _set_font(paragraph.runs[0], MEDIUM_FONT)
         if index == 0:
             _rule(paragraph)
