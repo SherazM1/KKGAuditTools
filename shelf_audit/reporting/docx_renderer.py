@@ -44,7 +44,7 @@ class DocxLayout:
     content_spacing: float = 6
     signature_spacing: float = 14
     metadata_spacing: float = 2
-    title_size: float = 12
+    title_size: float = 13.5
     body_size: float = 10.5
     margin: float = 0.65
 
@@ -173,7 +173,7 @@ def _rule(paragraph: Paragraph, edge: str = "top") -> None:
 def _set_font(run: Run, family: str) -> None:
     """Reference the installed face, without embedding or synthetic bolding."""
     run.font.name = family
-    run.bold = False
+    run.bold = family == BOLD_FONT
     fonts = run._r.get_or_add_rPr().rFonts
     for script in ("ascii", "hAnsi", "eastAsia", "cs"):
         fonts.set(qn(f"w:{script}"), family)
@@ -329,10 +329,10 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         logo_cell.paragraphs[0].add_run().add_picture(BytesIO(logo), width=Inches(0.88))
     title = identity_cell.paragraphs[0]
     title.add_run(report.title)
-    format_paragraph(title, size=22, font=BOLD_FONT, after=2)
+    format_paragraph(title, size=24, font=BOLD_FONT, after=2)
     if report.subtitle:
         subtitle = identity_cell.add_paragraph(report.subtitle.upper())
-        format_paragraph(subtitle, size=11, font=BOLD_FONT, blue=True, after=0)
+        format_paragraph(subtitle, size=12, font=BOLD_FONT, blue=True, after=0)
 
     def add_opportunity(container, item: ReportOpportunity, text_width: float) -> None:
         # Use exactly the same finding style inside the cell and at full width.
@@ -350,7 +350,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
             (RECOMMENDATION_LABEL, item.recommendation, True),
         ):
             paragraph = container.add_paragraph(label.upper())
-            format_paragraph(paragraph, size=9, font=BOLD_FONT, blue=True, after=1, keep_next=True)
+            format_paragraph(paragraph, size=10.5, font=BOLD_FONT, blue=True, after=1, keep_next=True)
             paragraph.paragraph_format.right_indent = right_indent
             paragraph = container.add_paragraph(text)
             format_paragraph(paragraph, after=layout.body_spacing, keep_next=short_section and not last, keep_lines=short_section)
@@ -388,6 +388,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         paragraph.add_run("  " + ("______________________________" if index == 0 else "__________________"))
         format_paragraph(paragraph, after=8, before=layout.signature_spacing if index == 0 else 0, keep_next=index < 1, keep_lines=True)
         _set_font(paragraph.runs[0], BOLD_FONT)
+        paragraph.runs[0].font.size = Pt(11)
         if index == 0:
             _rule(paragraph)
     footer = section.footer.paragraphs[0]

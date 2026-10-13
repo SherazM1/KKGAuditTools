@@ -21,9 +21,10 @@ from streamlit.testing.v1 import AppTest
 
 from shelf_audit.reporting import ReportMetadata, build_report
 from shelf_audit.reporting.docx_renderer import (
-    LAYOUT_PRESETS, MIN_BODY_FONT_SIZE, PHOTO_MAX_WIDTH, PHOTO_MAX_HEIGHT,
-    estimate_report_height, render_docx, select_layout,
-    photo_box_width, FRAME_WIDTH, FRAME_HEIGHT, FRAME_X, FRAME_Y, HEADER_TOP_MARGIN,
+    BOLD_FONT, BOOK_FONT, MEDIUM_FONT, LAYOUT_PRESETS, MIN_BODY_FONT_SIZE,
+    PHOTO_MAX_WIDTH, PHOTO_MAX_HEIGHT, _set_font, estimate_report_height,
+    render_docx, select_layout, photo_box_width, FRAME_WIDTH, FRAME_HEIGHT,
+    FRAME_X, FRAME_Y, HEADER_TOP_MARGIN,
 )
 from shelf_audit.reporting.formatting import DEFAULT_LOGO_PATH
 from shelf_audit.reporting.formatting import BLUE
@@ -180,11 +181,22 @@ class ShelfAuditDocxTests(unittest.TestCase):
             signature = next(p for p in doc.paragraphs if p.text.startswith("Signature:"))
             self.assertAlmostEqual(signature.paragraph_format.space_before.pt, layout.signature_spacing, delta=0.03)
 
+    def test_font_helper_sets_real_word_bold_for_gotham_bold(self):
+        for family, expected in ((BOOK_FONT, False), (MEDIUM_FONT, False), (BOLD_FONT, True)):
+            run = Document().add_paragraph().add_run("Sample")
+            _set_font(run, family)
+            self.assertEqual(run.bold, expected)
+            self.assertEqual(run.font.name, family)
+            for script in ("ascii", "hAnsi", "eastAsia", "cs"):
+                self.assertEqual(run._r.rPr.rFonts.get(qn(f"w:{script}")), family)
+
     def test_header_sizes_dividers_and_signature_only(self):
         doc = Document(BytesIO(render_docx(build_report(completed_result(3)))))
         title, subtitle = doc.sections[0].header.tables[0].cell(0, 1).paragraphs
-        self.assertEqual(title.runs[0].font.size.pt, 22)
-        self.assertEqual(subtitle.runs[0].font.size.pt, 11)
+        self.assertEqual(title.runs[0].font.size.pt, 24)
+        self.assertTrue(title.runs[0].font.bold)
+        self.assertEqual(subtitle.runs[0].font.size.pt, 12)
+        self.assertTrue(subtitle.runs[0].font.bold)
         table = doc.sections[0].header.tables[0]
         self.assertLessEqual(doc.sections[0].left_margin.inches + sum(column.width.inches for column in table.columns), FRAME_X - 0.15 + 0.001)
         logo_extent = doc.sections[0].header._element.xpath(".//wp:extent")[0]
@@ -234,10 +246,16 @@ class ShelfAuditDocxTests(unittest.TestCase):
             assert_font(paragraph.runs[0], "Gotham-Medium")
             assert_font(paragraph.runs[1], "Gotham-Book")
         heading = next(p for p in doc.paragraphs if p.text.startswith("01  "))
+        self.assertEqual(heading.runs[0].font.size.pt, 13.5)
+        self.assertEqual(heading.runs[1].font.size.pt, 13.5)
+        self.assertTrue(heading.runs[0].font.bold)
+        self.assertTrue(heading.runs[1].font.bold)
         for run in heading.runs:
             assert_font(run, "Gotham-Bold")
         for label in ("WHY", "RECOMMENDATION"):
             paragraph = next(p for p in doc.paragraphs if p.text == label)
+            self.assertEqual(paragraph.runs[0].font.size.pt, 10.5)
+            self.assertTrue(paragraph.runs[0].font.bold)
             assert_font(paragraph.runs[0], "Gotham-Bold")
         for text in (result.opportunities[0].evidence, result.opportunities[0].recommendation):
             paragraph = next(p for p in doc.paragraphs if p.text == text)
