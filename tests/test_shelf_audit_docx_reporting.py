@@ -82,6 +82,15 @@ class ShelfAuditDocxTests(unittest.TestCase):
                     extent = anchor.find(qn("wp:extent"))
                     self.assertAlmostEqual(int(extent.get("cx")) / 914400, 2.7)
                     self.assertAlmostEqual(int(extent.get("cy")) / 914400, 3.2)
+                    self.assertEqual((FRAME_X, FRAME_Y), (5.25, 0.65))
+                    # Include the outer half of the unchanged 1.5pt stroke.
+                    half_stroke = 0.75 / 72
+                    section = doc.sections[0]
+                    self.assertGreaterEqual(FRAME_X - half_stroke, 0)
+                    self.assertGreaterEqual(FRAME_Y - half_stroke, 0)
+                    self.assertLessEqual(FRAME_X + FRAME_WIDTH + half_stroke, section.page_width.inches)
+                    self.assertLessEqual(FRAME_Y + FRAME_HEIGHT + half_stroke, section.page_height.inches)
+                    self.assertLess(FRAME_Y, section.top_margin.inches)
                     self.assertEqual(anchor.find(qn("wp:wrapSquare")).get("wrapText"), "left")
                     self.assertEqual(anchor.get("distT"), "0")
                     self.assertEqual(anchor.get("distB"), "0")

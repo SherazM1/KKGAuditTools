@@ -29,8 +29,8 @@ MIN_BODY_FONT_SIZE = 10.0
 BOOK_FONT = "Gotham-Book"
 MEDIUM_FONT = "Gotham-Medium"
 BOLD_FONT = "Gotham-Bold"
-FRAME_X = 5.15  # Page-relative inches: 8.5 - 0.65 right margin - 2.7 frame.
-FRAME_Y = 1.35
+FRAME_X = 5.25  # Page-relative inches; frame ends at 7.95 on an 8.5-inch page.
+FRAME_Y = 0.65
 FRAME_BORDER_PT = 1.5
 TEXT_CLEARANCE = 0.15
 
