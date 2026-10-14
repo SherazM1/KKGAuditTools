@@ -4,6 +4,7 @@ from dataclasses import asdict
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
+from fontTools.ttLib import TTFont
 import subprocess
 import sys
 import tempfile
@@ -21,7 +22,7 @@ from streamlit.testing.v1 import AppTest
 
 from shelf_audit.reporting import ReportMetadata, build_report
 from shelf_audit.reporting.docx_renderer import (
-    BOLD_FONT, BOOK_FONT, MEDIUM_FONT, LAYOUT_PRESETS, MIN_BODY_FONT_SIZE,
+    BLACK_FONT, BOLD_FONT, MEDIUM_FONT, LAYOUT_PRESETS, MIN_BODY_FONT_SIZE,
     PHOTO_MAX_WIDTH, PHOTO_MAX_HEIGHT, _set_font, estimate_report_height,
     render_docx, select_layout, photo_box_width, FRAME_WIDTH, FRAME_HEIGHT,
     FRAME_X, FRAME_Y, HEADER_TOP_MARGIN,
@@ -97,7 +98,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
             paragraph = Paragraph(caption.find('.//' + qn('w:p')), doc)
             self.assertEqual(paragraph.text, "AUDIT REFERENCE IMAGE")
             self.assertEqual(paragraph.alignment, 1)
-            self.assertEqual(paragraph.runs[0].font.name, "Gotham-Bold")
+            self.assertEqual(paragraph.runs[0].font.name, "Gotham Bold")
             self.assertEqual(paragraph.runs[0].font.size.pt, 8)
             self.assertEqual(str(paragraph.runs[0].font.color.rgb), "141638")
             self.assertEqual(caption.find(qn("wp:wrapSquare")).get("wrapText"), "left")
@@ -182,13 +183,44 @@ class ShelfAuditDocxTests(unittest.TestCase):
             self.assertAlmostEqual(signature.paragraph_format.space_before.pt, layout.signature_spacing, delta=0.03)
 
     def test_font_helper_sets_real_word_bold_for_gotham_bold(self):
-        for family, expected in ((BOOK_FONT, False), (MEDIUM_FONT, False), (BOLD_FONT, True)):
+        for family, expected in ((MEDIUM_FONT, False), (BOLD_FONT, True), (BLACK_FONT, True)):
             run = Document().add_paragraph().add_run("Sample")
             _set_font(run, family)
             self.assertEqual(run.bold, expected)
             self.assertEqual(run.font.name, family)
             for script in ("ascii", "hAnsi", "eastAsia", "cs"):
                 self.assertEqual(run._r.rPr.rFonts.get(qn(f"w:{script}")), family)
+
+    def test_private_gotham_assets_and_embedded_font_package(self):
+        asset_dir = Path(__file__).resolve().parents[1] / "shelf_audit" / "assets" / "fonts"
+        expected_names = {
+            "Gotham Black": "Gotham-Black.ttf",
+            "Gotham Bold": "Gotham-Bold.ttf",
+            "Gotham Medium": "Gotham-Medium.ttf",
+        }
+        for family_name, filename in expected_names.items():
+            path = asset_dir / filename
+            self.assertTrue(path.exists(), f"Missing font asset: {path}")
+            self.assertTrue(path.stat().st_size > 0)
+            font = TTFont(str(path))
+            names = {record.toUnicode() for record in font["name"].names if record.nameID in (1, 16, 17)}
+            self.assertIn(family_name, names)
+        report = build_report(completed_result(1))
+        package = ZipFile(BytesIO(render_docx(report)))
+        names = set(package.namelist())
+        self.assertIn("word/fontTable.xml", names)
+        self.assertIn("word/_rels/fontTable.xml.rels", names)
+        self.assertIn("word/fonts/Gotham-Medium.ttf", names)
+        self.assertIn("word/fonts/Gotham-Bold.ttf", names)
+        self.assertIn("word/fonts/Gotham-Black.ttf", names)
+        document_rels = package.read("word/_rels/document.xml.rels").decode("utf-8")
+        self.assertIn("fontTable.xml", document_rels)
+        font_table = package.read("word/fontTable.xml").decode("utf-8")
+        for family_name in expected_names:
+            self.assertIn(family_name, font_table)
+        self.assertIn("Gotham-Medium.ttf", package.read("word/_rels/fontTable.xml.rels").decode("utf-8"))
+        self.assertIn("Gotham-Bold.ttf", package.read("word/_rels/fontTable.xml.rels").decode("utf-8"))
+        self.assertIn("Gotham-Black.ttf", package.read("word/_rels/fontTable.xml.rels").decode("utf-8"))
 
     def test_header_sizes_dividers_and_signature_only(self):
         doc = Document(BytesIO(render_docx(build_report(completed_result(3)))))
@@ -230,7 +262,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
         ))
         data = render_docx(report)
         doc = Document(BytesIO(data))
-        self.assertEqual(doc.styles["Normal"].font.name, "Gotham-Book")
+        self.assertEqual(doc.styles["Normal"].font.name, "Gotham Medium")
 
         def assert_font(run, family):
             self.assertEqual(run.font.name, family)
@@ -238,35 +270,36 @@ class ShelfAuditDocxTests(unittest.TestCase):
                 self.assertEqual(run._r.rPr.rFonts.get(qn(f"w:{script}")), family)
 
         title, subtitle = doc.sections[0].header.tables[0].cell(0, 1).paragraphs
-        assert_font(title.runs[0], "Gotham-Bold")
+        assert_font(title.runs[0], "Gotham Black")
         self.assertEqual(subtitle.text, "ACTIONABLE MERCHANDISING RECOMMENDATIONS")
-        assert_font(subtitle.runs[0], "Gotham-Bold")
+        assert_font(subtitle.runs[0], "Gotham Bold")
         self.assertEqual(str(subtitle.runs[0].font.color.rgb), BLUE.lstrip("#"))
         for paragraph in doc.paragraphs[:3]:
-            assert_font(paragraph.runs[0], "Gotham-Medium")
-            assert_font(paragraph.runs[1], "Gotham-Book")
+            assert_font(paragraph.runs[0], "Gotham Medium")
+            assert_font(paragraph.runs[1], "Gotham Medium")
         heading = next(p for p in doc.paragraphs if p.text.startswith("01  "))
         self.assertEqual(heading.runs[0].font.size.pt, 13.5)
         self.assertEqual(heading.runs[1].font.size.pt, 13.5)
         self.assertTrue(heading.runs[0].font.bold)
         self.assertTrue(heading.runs[1].font.bold)
         for run in heading.runs:
-            assert_font(run, "Gotham-Bold")
+            assert_font(run, "Gotham Bold")
         for label in ("WHY", "RECOMMENDATION"):
             paragraph = next(p for p in doc.paragraphs if p.text == label)
             self.assertEqual(paragraph.runs[0].font.size.pt, 10.5)
             self.assertTrue(paragraph.runs[0].font.bold)
-            assert_font(paragraph.runs[0], "Gotham-Bold")
+            assert_font(paragraph.runs[0], "Gotham Bold")
         for text in (result.opportunities[0].evidence, result.opportunities[0].recommendation):
             paragraph = next(p for p in doc.paragraphs if p.text == text)
-            assert_font(paragraph.runs[0], "Gotham-Book")
+            assert_font(paragraph.runs[0], "Gotham Medium")
         for label in ("Signature:", "Date:"):
             paragraph = next(p for p in doc.paragraphs if p.text.startswith(label))
-            assert_font(paragraph.runs[0], "Gotham-Bold")
-            assert_font(paragraph.runs[1], "Gotham-Book")
-        assert_font(doc.sections[0].footer.paragraphs[0].runs[0], "Gotham-Book")
+            assert_font(paragraph.runs[0], "Gotham Bold")
+            assert_font(paragraph.runs[1], "Gotham Medium")
+        assert_font(doc.sections[0].footer.paragraphs[0].runs[0], "Gotham Medium")
         with ZipFile(BytesIO(data)) as package:
-            self.assertFalse(any(name.startswith("word/fonts/") or name.endswith((".ttf", ".odttf")) for name in package.namelist()))
+            self.assertTrue(any(name.startswith("word/fonts/") and name.endswith(".ttf") for name in package.namelist()))
+            self.assertIn("word/fontTable.xml", package.namelist())
 
     def test_footer_year_is_calculated_at_render_time_without_mutating_report(self):
         report = build_report(completed_result(1))

@@ -18,6 +18,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from PIL import Image
 
+from .font_embedding import embed_report_fonts
 from .formatting import BLUE, NAVY, DEFAULT_LOGO_PATH, load_logo
 from .models import ReportOpportunity, ShelfOpportunityReport
 from .templates import NO_OPPORTUNITIES_TEXT, WHY_LABEL, RECOMMENDATION_LABEL
@@ -27,9 +28,9 @@ FRAME_HEIGHT = 3.2
 PHOTO_MAX_WIDTH = FRAME_WIDTH - 0.12
 PHOTO_MAX_HEIGHT = FRAME_HEIGHT - 0.25
 MIN_BODY_FONT_SIZE = 10.0
-BOOK_FONT = "Gotham-Book"
-MEDIUM_FONT = "Gotham-Medium"
-BOLD_FONT = "Gotham-Bold"
+BLACK_FONT = "Gotham Black"
+MEDIUM_FONT = "Gotham Medium"
+BOLD_FONT = "Gotham Bold"
 FRAME_X = 5.60  # Page-relative inches; frame ends at 8.30 on an 8.5-inch page.
 FRAME_Y = 0.35
 FRAME_BORDER_PT = 1.5
@@ -173,7 +174,7 @@ def _rule(paragraph: Paragraph, edge: str = "top") -> None:
 def _set_font(run: Run, family: str) -> None:
     """Reference the installed face, without embedding or synthetic bolding."""
     run.font.name = family
-    run.bold = family == BOLD_FONT
+    run.bold = family in (BOLD_FONT, BLACK_FONT)
     fonts = run._r.get_or_add_rPr().rFonts
     for script in ("ascii", "hAnsi", "eastAsia", "cs"):
         fonts.set(qn(f"w:{script}"), family)
@@ -286,7 +287,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
     section.header_distance = section.footer_distance = Inches(0.3)
     width = 8.5 - 2 * layout.margin
     normal = document.styles["Normal"]
-    normal.font.name = BOOK_FONT
+    normal.font.name = MEDIUM_FONT
     normal.font.size = Pt(layout.body_size)
     normal.font.color.rgb = RGBColor.from_string(NAVY.lstrip("#"))
     normal.paragraph_format.line_spacing = 1.12
@@ -296,7 +297,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
     document.core_properties.author = "Kendal King"
 
     def format_paragraph(
-        paragraph: Paragraph, *, size: float | None = None, font: str = BOOK_FONT,
+        paragraph: Paragraph, *, size: float | None = None, font: str = MEDIUM_FONT,
         blue: bool = False, after: float = 3, before: float = 0,
         keep_next: bool = False, keep_lines: bool = False,
     ) -> None:
@@ -329,7 +330,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
         logo_cell.paragraphs[0].add_run().add_picture(BytesIO(logo), width=Inches(0.88))
     title = identity_cell.paragraphs[0]
     title.add_run(report.title)
-    format_paragraph(title, size=24, font=BOLD_FONT, after=2)
+    format_paragraph(title, size=24, font=BLACK_FONT, after=2)
     if report.subtitle:
         subtitle = identity_cell.add_paragraph(report.subtitle.upper())
         format_paragraph(subtitle, size=12, font=BOLD_FONT, blue=True, after=0)
@@ -365,7 +366,7 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
     ):
         paragraph = document.add_paragraph()
         _set_font(paragraph.add_run(f"{label}: "), MEDIUM_FONT)
-        _set_font(paragraph.add_run(value or ""), BOOK_FONT)
+        _set_font(paragraph.add_run(value or ""), MEDIUM_FONT)
         paragraph.paragraph_format.space_after = Pt(layout.metadata_spacing)
     paragraph.paragraph_format.space_after = Pt(layout.metadata_spacing + layout.content_spacing)
 
@@ -393,8 +394,8 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
             _rule(paragraph)
     footer = section.footer.paragraphs[0]
     footer.add_run(f"{report.footer_text} {datetime.now(ZoneInfo('America/Chicago')).year}")
-    format_paragraph(footer, size=8, after=0)
+    format_paragraph(footer, size=8, font=MEDIUM_FONT, after=0)
     _rule(footer)
     output = BytesIO()
     document.save(output)
-    return output.getvalue()
+    return embed_report_fonts(output.getvalue())
