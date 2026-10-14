@@ -8,7 +8,7 @@ import logging
 import zipfile
 import uuid
 from pathlib import Path
-from xml.etree import ElementTree as ET
+from lxml import etree as ET
 
 from fontTools.ttLib import TTFont
 
@@ -23,6 +23,7 @@ FONT_ASSET_FILES = {
     "Gotham Black": "Gotham-Black.ttf",
     "Gotham Bold": "Gotham-Bold.ttf",
     "Gotham Medium": "Gotham-Medium.ttf",
+    "Gotham Book": "Gotham-Book.ttf",
 }
 
 
@@ -125,7 +126,7 @@ def embed_report_fonts(document_bytes: bytes, *, font_paths: dict[str, Path] | N
 
     font_table = ET.fromstring(members["word/fontTable.xml"]) if "word/fontTable.xml" in members else ET.Element(f"{{{NS_W}}}fonts")
     font_table_rels = ET.fromstring(members["word/_rels/fontTable.xml.rels"]) if "word/_rels/fontTable.xml.rels" in members else ET.Element(f"{{{NS_PKG_REL}}}Relationships")
-    family_order = ["Gotham Medium", "Gotham Bold", "Gotham Black"]
+    family_order = ["Gotham Medium", "Gotham Book", "Gotham Bold", "Gotham Black"]
     embedded_parts = {}
     for family_name in family_order:
         path = available.get(family_name)
@@ -155,7 +156,7 @@ def embed_report_fonts(document_bytes: bytes, *, font_paths: dict[str, Path] | N
         _ensure_content_type(content_types, part_name, "application/vnd.openxmlformats-officedocument.obfuscatedFont")
         rel_id = _ensure_relationship(font_table_rels, NS_R + "/font", f"fonts/{path.stem}.odttf")
         # Explicit faces: Medium is regular; Bold/Black are selected with w:b.
-        role = "embedRegular" if family_name == "Gotham Medium" else "embedBold"
+        role = "embedBold" if family_name in ("Gotham Bold", "Gotham Black") else "embedRegular"
         ET.SubElement(font_entry, f"{{{NS_W}}}{role}", {
             f"{{{NS_R}}}id": rel_id, f"{{{NS_W}}}fontKey": font_key,
             f"{{{NS_W}}}subsetted": "false",

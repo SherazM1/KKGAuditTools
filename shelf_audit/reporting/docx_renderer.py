@@ -1,6 +1,6 @@
 """Editable Word reports from final report data; no audit or Office dependency."""
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from copy import deepcopy
 from datetime import datetime
 from io import BytesIO
@@ -9,8 +9,7 @@ import textwrap
 from zoneinfo import ZoneInfo
 
 from docx import Document
-from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
@@ -18,46 +17,45 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from PIL import Image
 
-from .font_embedding import embed_report_fonts
+from .font_embedding import embed_report_fonts, discover_font_assets
 from .formatting import BLUE, NAVY, DEFAULT_LOGO_PATH, load_logo
 from .models import ReportOpportunity, ShelfOpportunityReport
 from .templates import NO_OPPORTUNITIES_TEXT, WHY_LABEL, RECOMMENDATION_LABEL
 
-FRAME_WIDTH = 2.7
-FRAME_HEIGHT = 3.2
-PHOTO_MAX_WIDTH = FRAME_WIDTH - 0.12
-PHOTO_MAX_HEIGHT = FRAME_HEIGHT - 0.25
-MIN_BODY_FONT_SIZE = 10.0
-BLACK_FONT = "Gotham Black"
-MEDIUM_FONT = "Gotham Medium"
-BOLD_FONT = "Gotham Bold"
-FRAME_X = 5.60  # Page-relative inches; frame ends at 8.30 on an 8.5-inch page.
-FRAME_Y = 0.35
-FRAME_BORDER_PT = 1.5
+# Page-relative composition measured from MOLLI.pdf (US Letter).
+FRAME_WIDTH = 2.48
+FRAME_HEIGHT = 3.28
+FRAME_X = 5.38
+FRAME_Y = 2.29
+FRAME_BORDER_PT = 1.0
 TEXT_CLEARANCE = 0.15
-HEADER_TOP_MARGIN = 1.5
+PHOTO_MAX_WIDTH = FRAME_WIDTH - 0.24
+PHOTO_MAX_HEIGHT = FRAME_HEIGHT - 0.36
+HEADER_TOP_MARGIN = 0.55
+CONTENT_TOP = 2.55
+BLACK_FONT = "Gotham Black"
+BOLD_FONT = "Gotham Bold"
+BOOK_FONT = "Gotham Book"
+MEDIUM_FONT = "Gotham Medium"  # Retained for existing callers; no report role.
+MIN_BODY_FONT_SIZE = 10.0
+TRACKING_PT = 1.2
+LOGO_X, LOGO_Y, LOGO_WIDTH = 6.82, 0.40, 1.05
 
 
 @dataclass(frozen=True)
 class DocxLayout:
-    section_spacing: float = 8
-    body_spacing: float = 3
-    content_spacing: float = 6
-    signature_spacing: float = 14
-    metadata_spacing: float = 2
-    title_size: float = 13.5
-    body_size: float = 10.5
-    margin: float = 0.65
+    section_spacing: float = 12
+    body_spacing: float = 12
+    content_spacing: float = 20
+    signature_spacing: float = 0
+    metadata_spacing: float = 0
+    title_size: float = 12
+    body_size: float = 10
+    margin: float = 0.63
 
 
-# Count controls body readability and base spacing; the architecture stays fixed.
-LAYOUT_PRESETS = (
-    DocxLayout(section_spacing=18, body_spacing=6, content_spacing=10, signature_spacing=28, body_size=11.5),
-    DocxLayout(section_spacing=14, body_spacing=5, content_spacing=8, signature_spacing=24, body_size=11.5),
-    DocxLayout(body_size=11),
-    DocxLayout(section_spacing=5, body_spacing=2, content_spacing=4, signature_spacing=8),
-    DocxLayout(section_spacing=5, body_spacing=2, content_spacing=4, signature_spacing=8, body_size=10),
-)
+# One hierarchy and rhythm, independent of finding count.
+LAYOUT_PRESETS = (DocxLayout(),) * 5
 
 
 def _photo_dimensions(data: bytes | None) -> tuple[int, int] | None:
@@ -87,23 +85,12 @@ def photo_box_width(layout: DocxLayout) -> float:
     return PHOTO_MAX_WIDTH
 
 
-def _metadata_height(report: ShelfOpportunityReport, layout: DocxLayout, width: float) -> float:
-    return sum(
-        _line_count(f"{label}: {value or ''}", width, layout.body_size)
-        * layout.body_size * 1.12 + layout.metadata_spacing
-        for label, value in (
-            ("Client", report.metadata.client), ("Retailer", report.metadata.retailer),
-            ("Location", report.metadata.location),
-        )
-    )
-
-
 def _opportunity_height(item: ReportOpportunity, layout: DocxLayout, width: float) -> float:
     return (
-        _line_count(f"{item.number:02d}  {item.title}", width, layout.title_size) * layout.title_size * 1.12
-        + 2 * 11
-        + sum(_line_count(value, width, layout.body_size) * layout.body_size * 1.12 for value in (item.evidence, item.recommendation))
-        + layout.section_spacing + 6 + 2 * layout.body_spacing
+        _line_count(f"{item.number:02d} {item.title}", width, layout.title_size) * 14
+        + 12 + 2 * (13 + 1)
+        + sum(_line_count(value, width, layout.body_size) * 12 for value in (item.evidence, item.recommendation))
+        + layout.section_spacing + 2 * layout.body_spacing
     )
 
 
@@ -118,48 +105,31 @@ def photo_size(report: ShelfOpportunityReport, layout: DocxLayout) -> tuple[floa
 
 
 def estimate_report_height(report: ShelfOpportunityReport, layout: DocxLayout) -> float:
-    """Estimate the fixed composition; never use this to choose a structure."""
+    """Conservative body estimate, excluding the independently reserved footer."""
     width = (8.5 - 2 * layout.margin) * 72
-    has_photo = photo_size(report, layout) is not None
-    text_width = (FRAME_X - TEXT_CLEARANCE - layout.margin) * 72 if has_photo else width
-    # Conservatively measure text at the upper-region width. Word releases the
-    # width below the frame via native square wrapping. No image height or image
-    # row is counted, so portrait/landscape cannot alter vertical spacing.
-    height = _metadata_height(report, layout, text_width) + layout.content_spacing
+    narrow = (FRAME_X - TEXT_CLEARANCE - layout.margin) * 72
+    cursor = CONTENT_TOP * 72
     for item in report.opportunities:
-        height += _opportunity_height(item, layout, text_width)
-    if not report.opportunities:
-        height += 24
-    return height + layout.signature_spacing + 48
+        text_width = narrow if report.audit_photo and cursor < (FRAME_Y + FRAME_HEIGHT) * 72 else width
+        cursor += _opportunity_height(item, layout, text_width)
+    return cursor - CONTENT_TOP * 72
 
 
 def select_layout(report: ShelfOpportunityReport) -> DocxLayout:
-    """Distribute spare page height without any image-dependent calculation.
+    """The approved type hierarchy never changes with count or copy length."""
+    return LAYOUT_PRESETS[0]
 
-    Count chooses body size and base gaps. Conservative text measurements only
-    limit extra spacing for long copy; they never move content or change layout.
-    """
-    count = len(report.opportunities)
-    base = LAYOUT_PRESETS[min(max(count, 1), 5) - 1]
-    if count == 0 or count >= 4:
-        return base
-    # Measure the narrow upper text region even with no photo, ensuring image
-    # presence, dimensions, and frame height cannot participate in distribution.
-    text_width = (FRAME_X - TEXT_CLEARANCE - base.margin) * 72
-    natural_height = (
-        _metadata_height(report, base, text_width) + base.content_spacing
-        + sum(_opportunity_height(item, base, text_width) for item in report.opportunities)
-        + base.signature_spacing + 48
-    )
-    available = (11 - HEADER_TOP_MARGIN - base.margin) * 72 - 40
-    extra = max(0, min((320, 280, 140)[count - 1], available - natural_height))
-    # Balanced rather than equal gaps: 55% between/before blocks, 45% before
-    # signature. Everything remains paragraph spacing in ordinary Word flow.
-    return replace(
-        base,
-        section_spacing=round(base.section_spacing + extra * 0.55 / count, 2),
-        signature_spacing=round(base.signature_spacing + extra * 0.45, 2),
-    )
+
+def _set_tracking(run: Run, points: float = TRACKING_PT) -> None:
+    """Word character spacing is in twentieths of a point, without text edits."""
+    properties = run._r.get_or_add_rPr()
+    spacing = properties.find(qn("w:spacing"))
+    if spacing is None:
+        spacing = OxmlElement("w:spacing")
+        properties.insert_element_before(spacing, "w:w", "w:kern", "w:position", "w:sz",
+                                         "w:szCs", "w:highlight", "w:u", "w:effect",
+                                         "w:bdr", "w:shd", "w:fitText", "w:vertAlign")
+    spacing.set(qn("w:val"), str(round(points * 20)))
 
 
 def _rule(paragraph: Paragraph, edge: str = "top") -> None:
@@ -203,6 +173,11 @@ def _add_audit_anchor(paragraph: Paragraph, data: bytes, size: tuple[float, floa
     outline.append(color_fill)
     picture.xpath("pic:spPr")[0].append(outline)
 
+    _anchor_picture(inline, FRAME_X, FRAME_Y)
+
+
+def _anchor_picture(inline, x: float, y: float, *, wrap_left: bool = True) -> None:
+    """Convert an unchanged image part to a fixed page-relative drawing."""
     anchor = OxmlElement("wp:anchor")
     for key, value in (("distT", "0"), ("distB", "0"), ("distL", str(int(Inches(TEXT_CLEARANCE)))), ("distR", "0"),
                        ("simplePos", "0"), ("relativeHeight", "0"), ("behindDoc", "0"),
@@ -212,7 +187,7 @@ def _add_audit_anchor(paragraph: Paragraph, data: bytes, size: tuple[float, floa
     simple.set("x", "0")
     simple.set("y", "0")
     anchor.append(simple)
-    for axis, position in (("H", FRAME_X), ("V", FRAME_Y)):
+    for axis, position in (("H", x), ("V", y)):
         element = OxmlElement(f"wp:position{axis}")
         element.set("relativeFrom", "page")
         offset = OxmlElement("wp:posOffset")
@@ -224,8 +199,9 @@ def _add_audit_anchor(paragraph: Paragraph, data: bytes, size: tuple[float, floa
     for edge in ("l", "t", "r", "b"):
         effect.set(edge, "0")
     anchor.append(effect)
-    wrap = OxmlElement("wp:wrapSquare")
-    wrap.set("wrapText", "left")
+    wrap = OxmlElement("wp:wrapSquare" if wrap_left else "wp:wrapNone")
+    if wrap_left:
+        wrap.set("wrapText", "left")
     anchor.append(wrap)
     for tag in ("wp:docPr", "wp:cNvGraphicFramePr", "a:graphic"):
         element = inline.find(qn(tag))
@@ -237,9 +213,9 @@ def _add_audit_anchor(paragraph: Paragraph, data: bytes, size: tuple[float, floa
 def _add_image_caption(paragraph: Paragraph) -> None:
     """A separate page-relative text shape; no paragraph/spacer in body flow."""
     anchor = deepcopy(paragraph._p.xpath(".//wp:anchor")[-1])
-    height = Inches(0.22)
+    height = Inches(0.16)
     anchor.find(qn("wp:extent")).set("cy", str(int(height)))
-    anchor.find(qn("wp:positionV")).find(qn("wp:posOffset")).text = str(int(Inches(FRAME_Y + FRAME_HEIGHT + 0.07)))
+    anchor.find(qn("wp:positionV")).find(qn("wp:posOffset")).text = str(int(Inches(FRAME_Y + FRAME_HEIGHT - 0.18)))
     properties = anchor.find(qn("wp:docPr"))
     properties.set("id", str(paragraph.part.next_id))
     properties.set("name", "Audit reference image caption")
@@ -264,7 +240,8 @@ def _add_image_caption(paragraph: Paragraph) -> None:
     text_paragraph.paragraph_format.line_spacing = 1.0
     run = text_paragraph.add_run("AUDIT REFERENCE IMAGE")
     _set_font(run, BOLD_FONT)
-    run.font.size = Pt(8)
+    run.font.size = Pt(5)
+    run.italic = True
     run.font.color.rgb = RGBColor.from_string(NAVY.lstrip("#"))
     anchor.append(graphic)
     drawing = OxmlElement("w:drawing")
@@ -278,124 +255,119 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
     Only Client/Retailer/Location metadata is rendered in V1. Optional images that
     are absent or invalid are omitted; no paths from finding references are read.
     """
+    if BOOK_FONT not in discover_font_assets():
+        raise FileNotFoundError("Shelf Audit DOCX requires licensed project asset Gotham-Book.ttf")
     layout = select_layout(report)
     document = Document()
     section = document.sections[0]
     section.page_width, section.page_height = Inches(8.5), Inches(11)
-    section.top_margin, section.bottom_margin = Inches(HEADER_TOP_MARGIN), Inches(layout.margin)
+    section.top_margin = Inches(HEADER_TOP_MARGIN)
+    section.bottom_margin = Inches(1.0)  # Reserve signature/footer independently.
     section.left_margin = section.right_margin = Inches(layout.margin)
-    section.header_distance = section.footer_distance = Inches(0.3)
+    section.header_distance, section.footer_distance = Inches(0.3), Inches(0.18)
     width = 8.5 - 2 * layout.margin
     normal = document.styles["Normal"]
-    normal.font.name = MEDIUM_FONT
-    normal.font.size = Pt(layout.body_size)
+    normal.font.name, normal.font.size = BOOK_FONT, Pt(10)
+    fonts = normal.element.get_or_add_rPr().get_or_add_rFonts()
+    for script in ("ascii", "hAnsi", "eastAsia", "cs"):
+        fonts.set(qn(f"w:{script}"), BOOK_FONT)
     normal.font.color.rgb = RGBColor.from_string(NAVY.lstrip("#"))
-    normal.paragraph_format.line_spacing = 1.12
-    normal.paragraph_format.space_after = Pt(3)
+    normal.paragraph_format.line_spacing = Pt(12)
+    normal.paragraph_format.space_after = Pt(0)
     normal.paragraph_format.widow_control = True
-    document.core_properties.title = report.title
-    document.core_properties.author = "Kendal King"
+    document.core_properties.title, document.core_properties.author = report.title, "Kendal King"
 
-    def format_paragraph(
-        paragraph: Paragraph, *, size: float | None = None, font: str = MEDIUM_FONT,
-        blue: bool = False, after: float = 3, before: float = 0,
-        keep_next: bool = False, keep_lines: bool = False,
-    ) -> None:
-        paragraph.paragraph_format.space_before = Pt(before)
-        paragraph.paragraph_format.space_after = Pt(after)
-        paragraph.paragraph_format.keep_with_next = keep_next
-        paragraph.paragraph_format.keep_together = keep_lines
+    def format_paragraph(paragraph, *, font=BOOK_FONT, size=10, line=12,
+                         before=0, after=0, blue=False, tracked=False, keep_next=False):
+        fmt = paragraph.paragraph_format
+        fmt.space_before, fmt.space_after = Pt(before), Pt(after)
+        fmt.line_spacing = Pt(line)
+        fmt.keep_with_next = keep_next
         for run in paragraph.runs:
             _set_font(run, font)
-            run.font.size = Pt(size or layout.body_size)
+            run.font.size = Pt(size)
             run.font.color.rgb = RGBColor.from_string((BLUE if blue else NAVY).lstrip("#"))
+            if tracked:
+                _set_tracking(run)
 
-    # A simple fixed table anchors the proportional official logo and identity.
-    header = section.header
-    header.paragraphs[0].paragraph_format.space_after = Pt(0)
-    header.paragraphs[0].paragraph_format.line_spacing = Pt(1)
-    header.paragraphs[0].paragraph_format.space_before = Pt(0)
-    header_width = FRAME_X - layout.margin - TEXT_CLEARANCE
-    header_table = header.add_table(rows=1, cols=2, width=Inches(header_width))
-    header_table.autofit = False
-    header_table.columns[0].width = Inches(1.1)
-    header_table.columns[1].width = Inches(header_width - 1.1)
-    logo_cell, identity_cell = header_table.rows[0].cells
-    logo_cell.width = Inches(1.1)
-    identity_cell.width = Inches(header_width - 1.1)
-    for cell in (logo_cell, identity_cell):
-        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+    title = document.add_paragraph(report.title)
+    format_paragraph(title, font=BLACK_FONT, size=30, line=36, after=6, keep_next=True)
+    title.paragraph_format.right_indent = Inches(1.20)
     logo = load_logo(logo_path)
     if logo:
-        logo_cell.paragraphs[0].add_run().add_picture(BytesIO(logo), width=Inches(0.88))
-    title = identity_cell.paragraphs[0]
-    title.add_run(report.title)
-    format_paragraph(title, size=24, font=BLACK_FONT, after=2)
+        inline = section.header.paragraphs[0].add_run().add_picture(BytesIO(logo), width=Inches(LOGO_WIDTH))._inline
+        _anchor_picture(inline, LOGO_X, LOGO_Y, wrap_left=False)
     if report.subtitle:
-        subtitle = identity_cell.add_paragraph(report.subtitle.upper())
-        format_paragraph(subtitle, size=12, font=BOLD_FONT, blue=True, after=0)
-
-    def add_opportunity(container, item: ReportOpportunity, text_width: float) -> None:
-        # Use exactly the same finding style inside the cell and at full width.
-        short_section = sum(_line_count(value, text_width * 72, layout.body_size) for value in (item.title, item.evidence, item.recommendation)) <= 12
-        heading = container.add_paragraph()
-        heading.add_run(f"{item.number:02d}  ")
-        heading.add_run(item.title)
-        format_paragraph(heading, size=layout.title_size, font=BOLD_FONT, before=layout.section_spacing, after=4, keep_next=True)
-        right_indent = Inches(width - text_width) if size and item.number == 1 else Inches(0)
-        heading.paragraph_format.right_indent = right_indent
-        if item.number > 2:
-            _rule(heading)
-        for label, text, last in (
-            (WHY_LABEL, item.evidence, False),
-            (RECOMMENDATION_LABEL, item.recommendation, True),
-        ):
-            paragraph = container.add_paragraph(label.upper())
-            format_paragraph(paragraph, size=10.5, font=BOLD_FONT, blue=True, after=1, keep_next=True)
-            paragraph.paragraph_format.right_indent = right_indent
-            paragraph = container.add_paragraph(text)
-            format_paragraph(paragraph, after=layout.body_spacing, keep_next=short_section and not last, keep_lines=short_section)
-            paragraph.paragraph_format.right_indent = right_indent
-            if item.number == 1 and last:
-                _rule(paragraph, "bottom")
-
-    # Metadata always precedes the main copy/photo region, at full usable width.
-    for label, value in (
-        ("Client", report.metadata.client), ("Retailer", report.metadata.retailer),
-        ("Location", report.metadata.location),
-    ):
+        subtitle = document.add_paragraph(report.subtitle.upper())
+        format_paragraph(subtitle, font=BOLD_FONT, size=11, line=14, after=14,
+                         blue=True, tracked=True, keep_next=True)
+    for label, value in (("Client", report.metadata.client), ("Retailer", report.metadata.retailer),
+                         ("Location", report.metadata.location)):
         paragraph = document.add_paragraph()
-        _set_font(paragraph.add_run(f"{label}: "), MEDIUM_FONT)
-        _set_font(paragraph.add_run(value or ""), MEDIUM_FONT)
-        paragraph.paragraph_format.space_after = Pt(layout.metadata_spacing)
-    paragraph.paragraph_format.space_after = Pt(layout.metadata_spacing + layout.content_spacing)
+        label_run = paragraph.add_run(f"{label}: ")
+        value_run = paragraph.add_run(value or "")
+        format_paragraph(paragraph, size=12, line=14, keep_next=True)
+        _set_font(label_run, BLACK_FONT)
+        _set_font(value_run, BOOK_FONT)
+    paragraph.paragraph_format.space_after = Pt(layout.content_spacing)
+    _rule(paragraph, "bottom")
+    image_size = photo_size(report, layout)
+    if image_size:
+        _add_audit_anchor(title, report.audit_photo, image_size)
+        _add_image_caption(title)
 
-    size = photo_size(report, layout)
-    if size:
-        # Stable first metadata paragraph owns one page-relative anchor. It has
-        # no inline extent, table, or frame-height spacer in the body flow.
-        _add_audit_anchor(document.paragraphs[0], report.audit_photo, size)
-        _add_image_caption(document.paragraphs[0])
-    text_width = FRAME_X - TEXT_CLEARANCE - layout.margin if size else width
-    for item in report.opportunities:
-        add_opportunity(document, item, text_width)
+    # Track paragraph heights at fixed leading. Native left-only square wrapping
+    # also guards against differences in Word's line breaking at the release point.
+    cursor = CONTENT_TOP * 72 - layout.section_spacing
+    previous_after = 0
+    panel_bottom = (FRAME_Y + FRAME_HEIGHT) * 72
+    narrow = FRAME_X - TEXT_CLEARANCE - layout.margin
+
+    def add_copy(text, *, font=BOOK_FONT, size=10, line=12, before=0, after=0,
+                 blue=False, tracked=False, keep_next=False, divider=False):
+        nonlocal cursor, previous_after
+        # Word uses the larger adjacent paragraph gap, rather than their sum.
+        cursor += max(0, before - previous_after)
+        constrained = bool(image_size and cursor < panel_bottom)
+        text_width = narrow if constrained else width
+        paragraph = document.add_paragraph(text)
+        format_paragraph(paragraph, font=font, size=size, line=line, before=before,
+                         after=after, blue=blue, tracked=tracked, keep_next=keep_next)
+        paragraph.paragraph_format.right_indent = Inches(width - text_width)
+        if divider:
+            _rule(paragraph)
+        cursor += _line_count(text, text_width * 72, size) * line + after
+        previous_after = after
+        return paragraph
+
+    for index, item in enumerate(report.opportunities):
+        add_copy(f"{item.number:02d} {item.title}", font=BLACK_FONT, size=12, line=14,
+                 before=layout.section_spacing, after=12,
+                 keep_next=True, divider=index > 0)
+        for label, text in ((WHY_LABEL, item.evidence), (RECOMMENDATION_LABEL, item.recommendation)):
+            add_copy(label.upper(), font=BOLD_FONT, size=11, line=13, after=1,
+                     blue=True, tracked=True, keep_next=True)
+            add_copy(text, after=layout.body_spacing)
     if not report.opportunities:
         document.add_paragraph(NO_OPPORTUNITIES_TEXT)
 
-    # These are ordinary editable paragraphs, not image-based signature artwork.
-    for index, label in enumerate(("Signature", "Date")):
-        paragraph = document.add_paragraph()
-        paragraph.add_run(f"{label}:")
-        paragraph.add_run("  " + ("______________________________" if index == 0 else "__________________"))
-        format_paragraph(paragraph, after=8, before=layout.signature_spacing if index == 0 else 0, keep_next=index < 1, keep_lines=True)
-        _set_font(paragraph.runs[0], BOLD_FONT)
-        paragraph.runs[0].font.size = Pt(11)
-        if index == 0:
-            _rule(paragraph)
-    footer = section.footer.paragraphs[0]
+    # Footer content reserves a stable bottom zone on every page, independent of
+    # finding count. A right-aligned tab keeps both editable blanks on one row.
+    signature = section.footer.paragraphs[0]
+    signature.paragraph_format.tab_stops.add_tab_stop(Inches(width), WD_TAB_ALIGNMENT.RIGHT)
+    signature.add_run("Signature: ")
+    signature.add_run("__________________________")
+    signature.add_run("\t")
+    signature.add_run("Date: ")
+    signature.add_run("__________________________")
+    format_paragraph(signature, font=BOOK_FONT, size=10, line=14, after=18)
+    _set_font(signature.runs[0], BLACK_FONT)
+    _set_font(signature.runs[3], BLACK_FONT)
+    _rule(signature, "bottom")
+    footer = section.footer.add_paragraph()
+    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     footer.add_run(f"{report.footer_text} {datetime.now(ZoneInfo('America/Chicago')).year}")
-    format_paragraph(footer, size=8, font=MEDIUM_FONT, after=0)
-    _rule(footer)
+    format_paragraph(footer, size=8, line=10)
     output = BytesIO()
     document.save(output)
     return embed_report_fonts(output.getvalue())

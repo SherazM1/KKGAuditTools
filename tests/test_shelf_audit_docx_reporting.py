@@ -27,7 +27,7 @@ from shelf_audit.reporting.docx_renderer import (
     BLACK_FONT, BOLD_FONT, MEDIUM_FONT, LAYOUT_PRESETS, MIN_BODY_FONT_SIZE,
     PHOTO_MAX_WIDTH, PHOTO_MAX_HEIGHT, _set_font, estimate_report_height,
     render_docx, select_layout, photo_box_width, FRAME_WIDTH, FRAME_HEIGHT,
-    FRAME_X, FRAME_Y, HEADER_TOP_MARGIN,
+    FRAME_X, FRAME_Y, HEADER_TOP_MARGIN, BOOK_FONT, TRACKING_PT, LOGO_X, LOGO_Y, LOGO_WIDTH,
 )
 from shelf_audit.reporting.formatting import DEFAULT_LOGO_PATH
 from shelf_audit.reporting.formatting import BLUE
@@ -68,121 +68,157 @@ def media_bytes(data):
 
 
 class ShelfAuditDocxTests(unittest.TestCase):
-    def test_first_opportunity_has_fixed_indent_and_later_findings_return_full_width(self):
-        for image in (photo_bytes(), None, b"invalid"):
-            with self.subTest(valid=bool(image and image != b"invalid")):
-                report = build_report(completed_result(3), audit_photo=image)
-                doc = Document(BytesIO(render_docx(report)))
-                self.assertEqual(len(doc.tables), 0)
-                start = next(index for index, p in enumerate(doc.paragraphs) if p.text.startswith("01  "))
-                end = next(index for index, p in enumerate(doc.paragraphs) if p.text.startswith("02  "))
-                expected = 2.4 if image and image != b"invalid" else 0
-                for paragraph in doc.paragraphs[start:end]:
-                    self.assertAlmostEqual(paragraph.paragraph_format.right_indent.inches, expected, places=3)
-                for paragraph in doc.paragraphs[end:]:
-                    self.assertEqual(paragraph.paragraph_format.right_indent or 0, 0)
 
-    def test_caption_is_anchored_centered_navy_and_absent_without_valid_image(self):
-        for photo in (photo_bytes((300, 900)), photo_bytes((900, 300)), None, b"invalid"):
-            report = build_report(completed_result(2), audit_photo=photo)
+    def test_approved_typography_tracking_and_metadata_order(self):
+        for count in (1, 2, 3, 4, 8):
+            report = build_report(completed_result(count), metadata=ReportMetadata(client='Tide', retailer='Walmart', location='Bentonville, Arkansas'))
             doc = Document(BytesIO(render_docx(report)))
-            captions = doc.element.xpath('//wp:anchor[.//w:t[text()="AUDIT REFERENCE IMAGE"]]')
-            if photo is None or photo == b"invalid":
-                self.assertEqual(captions, [])
-                continue
-            self.assertEqual(len(captions), 1)
-            self.assertEqual(len(doc.element.xpath('//wp:anchor')), 2)
-            caption = captions[0]
-            x = int(caption.find(qn("wp:positionH")).find(qn("wp:posOffset")).text) / 914400
-            y = int(caption.find(qn("wp:positionV")).find(qn("wp:posOffset")).text) / 914400
-            self.assertAlmostEqual(x, FRAME_X)
-            self.assertAlmostEqual(y, FRAME_Y + FRAME_HEIGHT + 0.07)
-            paragraph = Paragraph(caption.find('.//' + qn('w:p')), doc)
-            self.assertEqual(paragraph.text, "AUDIT REFERENCE IMAGE")
-            self.assertEqual(paragraph.alignment, 1)
-            self.assertEqual(paragraph.runs[0].font.name, "Gotham Bold")
-            self.assertEqual(paragraph.runs[0].font.size.pt, 8)
-            self.assertEqual(str(paragraph.runs[0].font.color.rgb), "141638")
-            self.assertEqual(caption.find(qn("wp:wrapSquare")).get("wrapText"), "left")
+            self.assertEqual(doc.styles['Normal'].font.name, BOOK_FONT)
+            self.assertEqual(select_layout(report), LAYOUT_PRESETS[0])
+            def check(run, font, size, tracked=False):
+                self.assertEqual(run.font.name, font)
+                self.assertEqual(run.font.size.pt, size)
+                self.assertEqual(run.bold, font in (BLACK_FONT, BOLD_FONT))
+                for script in ('ascii', 'hAnsi', 'eastAsia', 'cs'):
+                    self.assertEqual(run._r.rPr.rFonts.get(qn('w:'+script)), font)
+                spacing = run._r.rPr.find(qn('w:spacing'))
+                if tracked:
+                    self.assertEqual(spacing.get(qn('w:val')), str(round(TRACKING_PT * 20)))
+            title, subtitle = doc.paragraphs[:2]
+            self.assertEqual(title.text, report.title)
+            check(title.runs[0], BLACK_FONT, 30)
+            self.assertEqual(subtitle.text, report.subtitle.upper())
+            check(subtitle.runs[0], BOLD_FONT, 11, True)
+            self.assertEqual(str(subtitle.runs[0].font.color.rgb), BLUE.lstrip('#'))
+            for paragraph, label, value in zip(doc.paragraphs[2:5], ('Client', 'Retailer', 'Location'), ('Tide', 'Walmart', 'Bentonville, Arkansas')):
+                self.assertEqual(paragraph.text, f'{label}: {value}')
+                check(paragraph.runs[0], BLACK_FONT, 12)
+                check(paragraph.runs[1], BOOK_FONT, 12)
+            for item in report.opportunities:
+                heading = next(p for p in doc.paragraphs if p.text == f'{item.number:02d} {item.title}')
+                check(heading.runs[0], BLACK_FONT, 12)
+                for text in (item.evidence, item.recommendation):
+                    check(next(p for p in doc.paragraphs if p.text == text).runs[0], BOOK_FONT, 10)
+            for paragraph in doc.paragraphs:
+                if paragraph.text in ('WHY', 'RECOMMENDATION'):
+                    check(paragraph.runs[0], BOLD_FONT, 11, True)
+                    self.assertEqual(str(paragraph.runs[0].font.color.rgb), BLUE.lstrip('#'))
 
-    def test_page_anchor_is_fixed_and_independent_from_body_flow(self):
-        for count in (0, 1, 2, 3, 4, 8):
-            for size in ((300, 900), (900, 300)):
-                with self.subTest(count=count, size=size):
-                    report = build_report(completed_result(count), audit_photo=photo_bytes(size))
-                    doc = Document(BytesIO(render_docx(report)))
-                    self.assertEqual(len(doc.tables), 0)
-                    self.assertEqual(len(doc.inline_shapes), 0)
-                    anchors = doc.element.xpath("//wp:anchor[.//pic:pic]")
-                    self.assertEqual(len(anchors), 1)
-                    anchor = anchors[0]
-                    for axis, inches in (("H", FRAME_X), ("V", FRAME_Y)):
-                        position = anchor.find(qn("wp:position" + axis))
-                        self.assertEqual(position.get("relativeFrom"), "page")
-                        self.assertAlmostEqual(int(position.find(qn("wp:posOffset")).text) / 914400, inches)
-                    extent = anchor.find(qn("wp:extent"))
-                    self.assertAlmostEqual(int(extent.get("cx")) / 914400, 2.7)
-                    self.assertAlmostEqual(int(extent.get("cy")) / 914400, 3.2)
-                    self.assertEqual((FRAME_X, FRAME_Y), (5.60, 0.35))
-                    # Include the outer half of the unchanged 1.5pt stroke.
-                    half_stroke = 0.75 / 72
-                    section = doc.sections[0]
-                    self.assertGreaterEqual(FRAME_X - half_stroke, 0)
-                    self.assertGreaterEqual(FRAME_Y - half_stroke, 0)
-                    self.assertLessEqual(FRAME_X + FRAME_WIDTH + half_stroke, section.page_width.inches)
-                    self.assertLessEqual(FRAME_Y + FRAME_HEIGHT + half_stroke, section.page_height.inches)
-                    self.assertLess(FRAME_Y, section.top_margin.inches)
-                    self.assertEqual(anchor.find(qn("wp:wrapSquare")).get("wrapText"), "left")
-                    self.assertEqual(anchor.get("distT"), "0")
-                    self.assertEqual(anchor.get("distB"), "0")
-                    outline = doc.element.xpath("//pic:spPr/a:ln")[0]
-                    self.assertEqual(int(outline.get("w")) / 12700, 1.5)
-                    self.assertEqual(outline.find(qn("a:solidFill")).find(qn("a:srgbClr")).get("val"), "141638")
-                    for item in report.opportunities:
-                        for value in (item.title, item.evidence, item.recommendation):
-                            self.assertIn(value, "\n".join(p.text for p in doc.paragraphs))
-                    self.assertTrue(doc.paragraphs[0]._p.xpath(".//wp:anchor"))
-                    for p in doc.paragraphs[3:]:
-                        self.assertFalse(p._p.xpath(".//wp:anchor"))
+    def test_reference_anchors_logo_panel_caption_and_original_assets(self):
+        for photo in (photo_bytes((300,900)), photo_bytes((900,300)), None, b'invalid'):
+            data = render_docx(build_report(completed_result(3), audit_photo=photo))
+            doc = Document(BytesIO(data))
+            logo = doc.sections[0].header._element.xpath('//wp:anchor')[0]
+            def position(anchor, axis):
+                return int(anchor.find(qn('wp:position'+axis)).find(qn('wp:posOffset')).text) / 914400
+            self.assertAlmostEqual(position(logo, 'H'), LOGO_X)
+            self.assertAlmostEqual(position(logo, 'V'), LOGO_Y)
+            self.assertAlmostEqual(int(logo.find(qn('wp:extent')).get('cx'))/914400, LOGO_WIDTH)
+            self.assertEqual(logo.find(qn('wp:positionH')).get('relativeFrom'), 'page')
+            self.assertIn(DEFAULT_LOGO_PATH.read_bytes(), media_bytes(data))
+            self.assertEqual(len(doc.tables), 0)
+            self.assertEqual(len(doc.inline_shapes), 0)
+            anchors = doc.element.xpath('//wp:anchor')
+            if photo is None or photo == b'invalid':
+                self.assertEqual(anchors, [])
+                continue
+            self.assertEqual(len(anchors), 2)
+            image, caption = anchors
+            self.assertEqual((FRAME_X, FRAME_Y, FRAME_WIDTH, FRAME_HEIGHT), (5.38, 2.29, 2.48, 3.28))
+            for axis, expected in (('H', FRAME_X), ('V', FRAME_Y)):
+                self.assertAlmostEqual(position(image, axis), expected)
+                self.assertEqual(image.find(qn('wp:position'+axis)).get('relativeFrom'), 'page')
+            extent = image.find(qn('wp:extent'))
+            self.assertAlmostEqual(int(extent.get('cx'))/914400, FRAME_WIDTH)
+            self.assertAlmostEqual(int(extent.get('cy'))/914400, FRAME_HEIGHT)
+            self.assertEqual(image.find(qn('wp:wrapSquare')).get('wrapText'), 'left')
+            outline = image.find('.//'+qn('a:ln'))
+            self.assertEqual(int(outline.get('w'))/12700, 1)
+            self.assertEqual(outline.find('.//'+qn('a:srgbClr')).get('val'), '141638')
+            self.assertAlmostEqual(position(caption, 'V'), FRAME_Y + FRAME_HEIGHT - .18)
+            paragraph = Paragraph(caption.find('.//'+qn('w:p')), doc)
+            self.assertEqual(paragraph.text, 'AUDIT REFERENCE IMAGE')
+            self.assertEqual(paragraph.alignment, 1)
+            self.assertEqual(paragraph.runs[0].font.size.pt, 5)
+            self.assertEqual(paragraph.runs[0].font.name, BOLD_FONT)
+            self.assertTrue(paragraph.runs[0].italic)
+            self.assertIn(photo, media_bytes(data))
+
+    def test_constraints_release_below_panel_and_rhythm_is_count_independent(self):
+        result = completed_result(4)
+        for item in result.opportunities:
+            item.evidence = 'The large Rollback sign dominates the pallet, while the exposed cardboard tier edges and black base carry no Tide graphics.'
+            item.recommendation = 'Give the existing pallet more Tide presence with branded tier-edge strips and a base wrap, keeping the Rollback price clearly visible.'
+        doc = Document(BytesIO(render_docx(build_report(result, audit_photo=photo_bytes()))))
+        opportunity_copy = doc.paragraphs[5:]
+        indents = [p.paragraph_format.right_indent.inches for p in opportunity_copy]
+        self.assertAlmostEqual(indents[0], 2.64, places=3)
+        self.assertIn(0, indents)
+        first_full = indents.index(0)
+        self.assertTrue(all(indent == 0 for indent in indents[first_full:]))
+        top_rule = doc.paragraphs[4]._p.pPr.find(qn('w:pBdr')).find(qn('w:bottom'))
+        self.assertEqual(top_rule.get(qn('w:color')), '141638')
+        headings = [p for p in opportunity_copy if p.text[:2].isdigit()]
+        for heading in headings[1:]:
+            border = heading._p.pPr.find(qn('w:pBdr')).find(qn('w:top'))
+            self.assertEqual(border.get(qn('w:sz')), '4')
+            self.assertEqual(border.get(qn('w:color')), '141638')
+            self.assertEqual(heading.paragraph_format.space_before.pt, 12)
+        formats = []
+        for count in (1,2,3,4):
+            document = Document(BytesIO(render_docx(build_report(completed_result(count)))))
+            formats.append([p._p.pPr.xml for p in document.paragraphs[5:10]])
+        self.assertTrue(all(fmt == formats[0] for fmt in formats))
+
+    def test_bottom_signature_date_and_centered_footer_are_stable(self):
+        zones = []
+        for count in (1,2,3,4,8):
+            doc = Document(BytesIO(render_docx(build_report(completed_result(count)))))
+            self.assertFalse(any(p.text.startswith(('Signature:', 'Date:')) for p in doc.paragraphs))
+            section = doc.sections[0]
+            self.assertEqual(section.bottom_margin.inches, 1)
+            signature, footer = section.footer.paragraphs
+            self.assertIn('Signature: __________________________', signature.text)
+            self.assertIn('\tDate: __________________________', signature.text)
+            self.assertEqual(signature.runs[0].font.name, BLACK_FONT)
+            self.assertEqual(signature.runs[3].font.name, BLACK_FONT)
+            self.assertEqual(signature.runs[0].font.size.pt, 10)
+            tab = signature._p.pPr.find(qn('w:tabs'))[0]
+            self.assertEqual(tab.get(qn('w:val')), 'right')
+            self.assertEqual(footer.alignment, 1)
+            self.assertEqual(footer.runs[0].font.name, BOOK_FONT)
+            self.assertEqual(footer.runs[0].font.size.pt, 8)
+            self.assertAlmostEqual(section.footer_distance.inches, .18, places=3)
+            zones.append(str(section.footer._element.xml))
+        self.assertEqual(len(set(zones)), 1)
+
+    def test_missing_book_is_an_explicit_dependency_error(self):
+        with patch('shelf_audit.reporting.docx_renderer.discover_font_assets', return_value={}):
+            with self.assertRaisesRegex(FileNotFoundError, 'Gotham-Book.ttf'):
+                render_docx(build_report(completed_result(1)))
+
+    def test_long_reports_flow_without_type_changes_or_truncation(self):
+        result = completed_result(8)
+        for index, item in enumerate(result.opportunities):
+            item.evidence = f'Long test section {index}. ' * 100
+        report = build_report(result, audit_photo=photo_bytes())
+        self.assertEqual(select_layout(report), LAYOUT_PRESETS[0])
+        data = render_docx(report)
+        for item in report.opportunities:
+            self.assertIn(item.evidence, docx_text(data))
+        doc = Document(BytesIO(data))
+        self.assertEqual(doc.styles['Normal'].font.size.pt, 10)
+        self.assertIn('Signature:', doc.sections[0].footer.paragraphs[0].text)
+
 
     def test_image_orientation_does_not_change_opportunity_spacing_or_estimates(self):
         for count in (2, 3, 4):
             reports = [build_report(completed_result(count), audit_photo=photo_bytes(size)) for size in ((300, 900), (900, 300))]
             self.assertEqual(estimate_report_height(reports[0], select_layout(reports[0])), estimate_report_height(reports[1], select_layout(reports[1])))
             documents = [Document(BytesIO(render_docx(report))) for report in reports]
-            for first, second in zip(documents[0].paragraphs[3:], documents[1].paragraphs[3:]):
+            for first, second in zip(documents[0].paragraphs[5:], documents[1].paragraphs[5:]):
                 self.assertEqual(first.text, second.text)
                 self.assertEqual(first._p.pPr.xml, second._p.pPr.xml)
-
-    def test_count_typography_and_page_distribution_ignore_image(self):
-        for count, expected_size in ((1, 11.5), (2, 11.5), (3, 11), (4, 10.5), (8, 10)):
-            report = build_report(completed_result(count))
-            layout = select_layout(report)
-            self.assertEqual(layout.body_size, expected_size)
-            for image in (None, photo_bytes((300, 900)), photo_bytes((900, 300)), b"invalid"):
-                self.assertEqual(select_layout(build_report(completed_result(count), audit_photo=image)), layout)
-            result = completed_result(count)
-            result.opportunities[0].evidence = "Long unchanged wording. " * 200
-            long_layout = select_layout(build_report(result))
-            self.assertEqual(long_layout.body_size, layout.body_size)
-            self.assertLessEqual(long_layout.section_spacing, layout.section_spacing)
-            self.assertLessEqual(long_layout.signature_spacing, layout.signature_spacing)
-        for layout in LAYOUT_PRESETS:
-            self.assertGreaterEqual(layout.body_size, 10)
-            self.assertEqual(layout.margin, 0.65)
-        two = select_layout(build_report(completed_result(2)))
-        four = select_layout(build_report(completed_result(4)))
-        self.assertGreater(two.section_spacing, four.section_spacing + 50)
-        self.assertGreater(two.signature_spacing, four.signature_spacing + 100)
-        for count in (1, 2, 3, 4, 8):
-            report = build_report(completed_result(count))
-            doc = Document(BytesIO(render_docx(report)))
-            layout = select_layout(report)
-            for item in report.opportunities:
-                paragraph = next(p for p in doc.paragraphs if p.text == item.evidence)
-                self.assertEqual(paragraph.runs[0].font.size.pt, layout.body_size)
-            signature = next(p for p in doc.paragraphs if p.text.startswith("Signature:"))
-            self.assertAlmostEqual(signature.paragraph_format.space_before.pt, layout.signature_spacing, delta=0.03)
 
     def test_font_helper_sets_real_word_bold_for_gotham_bold(self):
         for family, expected in ((MEDIUM_FONT, False), (BOLD_FONT, True), (BLACK_FONT, True)):
@@ -199,6 +235,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
             "Gotham Black": "Gotham-Black.ttf",
             "Gotham Bold": "Gotham-Bold.ttf",
             "Gotham Medium": "Gotham-Medium.ttf",
+            "Gotham Book": "Gotham-Book.ttf",
         }
         for family_name, filename in expected_names.items():
             path = asset_dir / filename
@@ -235,10 +272,15 @@ class ShelfAuditDocxTests(unittest.TestCase):
             self.assertEqual(len(package.namelist()), len(set(package.namelist())))
             self.assertFalse(any(name.endswith('.ttf') for name in package.namelist()))
             table = ET.fromstring(package.read('word/fontTable.xml'))
+            # Compatibility prefixes in attribute values must retain declarations.
+            from lxml import etree
+            font_root = etree.fromstring(package.read('word/fontTable.xml'))
+            ignorable = font_root.get('{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable', '')
+            self.assertTrue(all(prefix in font_root.nsmap for prefix in ignorable.split()))
             rels = ET.fromstring(package.read('word/_rels/fontTable.xml.rels'))
             targets = {rel.get('Id'): 'word/' + rel.get('Target') for rel in rels}
-            self.assertEqual(len(targets), 3)
-            self.assertEqual(len(set(targets.values())), 3)
+            self.assertEqual(len(targets), 4)
+            self.assertEqual(len(set(targets.values())), 4)
             for rel in rels:
                 self.assertEqual(rel.get('Type'), NS_R + '/font')
             types = ET.fromstring(package.read('[Content_Types].xml'))
@@ -250,7 +292,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
                 self.assertEqual(info['fs_type'], 0x0104)
                 self.assertTrue(info['embed_allowed'])
                 entry = next(item for item in table if item.get('{'+NS_W+'}name') == info['family_name'])
-                role = 'embedRegular' if family == 'Gotham Medium' else 'embedBold'
+                role = 'embedBold' if family in ('Gotham Bold', 'Gotham Black') else 'embedRegular'
                 reference = entry.find('{'+NS_W+'}'+role)
                 key = uuid.UUID(reference.get('{'+NS_W+'}fontKey')).bytes[::-1]
                 part = targets[reference.get('{'+NS_R+'}id')]
@@ -301,84 +343,11 @@ class ShelfAuditDocxTests(unittest.TestCase):
         expected = bytes.fromhex('ffeeddccbbaa99887766554433221100') * 2
         self.assertEqual(_obfuscate_font(bytes(32) + b'unchanged', key), expected + b'unchanged')
 
-    def test_header_sizes_dividers_and_signature_only(self):
-        doc = Document(BytesIO(render_docx(build_report(completed_result(3)))))
-        title, subtitle = doc.sections[0].header.tables[0].cell(0, 1).paragraphs
-        self.assertEqual(title.runs[0].font.size.pt, 24)
-        self.assertTrue(title.runs[0].font.bold)
-        self.assertEqual(subtitle.runs[0].font.size.pt, 12)
-        self.assertTrue(subtitle.runs[0].font.bold)
-        table = doc.sections[0].header.tables[0]
-        self.assertLessEqual(doc.sections[0].left_margin.inches + sum(column.width.inches for column in table.columns), FRAME_X - 0.15 + 0.001)
-        logo_extent = doc.sections[0].header._element.xpath(".//wp:extent")[0]
-        self.assertAlmostEqual(int(logo_extent.get("cx")) / 914400, 0.88)
-        self.assertIn(DEFAULT_LOGO_PATH.read_bytes(), media_bytes(render_docx(build_report(completed_result(3)))))
-        headings = [p for p in doc.paragraphs if p.text.startswith(("01  ", "02  ", "03  "))]
-        self.assertIsNone(headings[0]._p.pPr.find(qn("w:pBdr")))
-        first_recommendation = next(p for p in doc.paragraphs if p.text == "Take action 0.")
-        first_border = first_recommendation._p.pPr.find(qn("w:pBdr")).find(qn("w:bottom"))
-        self.assertEqual(first_border.get(qn("w:color")), "141638")
-        self.assertEqual(first_border.get(qn("w:sz")), "4")
-        for heading in headings[2:]:
-            border = heading._p.pPr.find(qn("w:pBdr")).find(qn("w:top"))
-            self.assertEqual(border.get(qn("w:color")), "141638")
-            self.assertEqual(border.get(qn("w:sz")), "4")
-        text = "\n".join(p.text for p in doc.paragraphs)
-        self.assertNotIn("Approved By", text)
-        self.assertIn("Signature:  ______________________________", text)
-        self.assertIn("Date:  __________________", text)
-
     def test_missing_invalid_photo_omits_frame_without_empty_columns(self):
         for photo in (None, b"invalid"):
             doc = Document(BytesIO(render_docx(build_report(completed_result(2), audit_photo=photo))))
             self.assertEqual(len(doc.tables), 0)
             self.assertIn("Visible evidence 0.", "\n".join(p.text for p in doc.paragraphs))
-
-    def test_gotham_faces_in_expected_roles_and_embedded_fonts(self):
-        result = completed_result(1)
-        report = build_report(result, metadata=ReportMetadata(
-            client="Test Client", retailer="Test Retailer", location="Test Location",
-        ))
-        data = render_docx(report)
-        doc = Document(BytesIO(data))
-        self.assertEqual(doc.styles["Normal"].font.name, "Gotham Medium")
-
-        def assert_font(run, family):
-            self.assertEqual(run.font.name, family)
-            for script in ("ascii", "hAnsi", "eastAsia", "cs"):
-                self.assertEqual(run._r.rPr.rFonts.get(qn(f"w:{script}")), family)
-
-        title, subtitle = doc.sections[0].header.tables[0].cell(0, 1).paragraphs
-        assert_font(title.runs[0], "Gotham Black")
-        self.assertEqual(subtitle.text, "ACTIONABLE MERCHANDISING RECOMMENDATIONS")
-        assert_font(subtitle.runs[0], "Gotham Bold")
-        self.assertEqual(str(subtitle.runs[0].font.color.rgb), BLUE.lstrip("#"))
-        for paragraph in doc.paragraphs[:3]:
-            assert_font(paragraph.runs[0], "Gotham Medium")
-            assert_font(paragraph.runs[1], "Gotham Medium")
-        heading = next(p for p in doc.paragraphs if p.text.startswith("01  "))
-        self.assertEqual(heading.runs[0].font.size.pt, 13.5)
-        self.assertEqual(heading.runs[1].font.size.pt, 13.5)
-        self.assertTrue(heading.runs[0].font.bold)
-        self.assertTrue(heading.runs[1].font.bold)
-        for run in heading.runs:
-            assert_font(run, "Gotham Bold")
-        for label in ("WHY", "RECOMMENDATION"):
-            paragraph = next(p for p in doc.paragraphs if p.text == label)
-            self.assertEqual(paragraph.runs[0].font.size.pt, 10.5)
-            self.assertTrue(paragraph.runs[0].font.bold)
-            assert_font(paragraph.runs[0], "Gotham Bold")
-        for text in (result.opportunities[0].evidence, result.opportunities[0].recommendation):
-            paragraph = next(p for p in doc.paragraphs if p.text == text)
-            assert_font(paragraph.runs[0], "Gotham Medium")
-        for label in ("Signature:", "Date:"):
-            paragraph = next(p for p in doc.paragraphs if p.text.startswith(label))
-            assert_font(paragraph.runs[0], "Gotham Bold")
-            assert_font(paragraph.runs[1], "Gotham Medium")
-        assert_font(doc.sections[0].footer.paragraphs[0].runs[0], "Gotham Medium")
-        with ZipFile(BytesIO(data)) as package:
-            self.assertTrue(any(name.startswith("word/fonts/") and name.endswith(".odttf") for name in package.namelist()))
-            self.assertIn("word/fontTable.xml", package.namelist())
 
     def test_footer_year_is_calculated_at_render_time_without_mutating_report(self):
         report = build_report(completed_result(1))
@@ -418,8 +387,8 @@ class ShelfAuditDocxTests(unittest.TestCase):
                 self.assertIn(report.title, text)
                 self.assertIn(report.subtitle.upper(), text)
                 self.assertNotIn("Approved By", text)
-                self.assertIn("Signature:  ______________________________", text)
-                self.assertIn("Date:  __________________", text)
+                self.assertIn("Signature: __________________________", text)
+                self.assertIn("Date: __________________________", text)
                 if count == 0:
                     self.assertIn(NO_OPPORTUNITIES_TEXT, text)
 
@@ -492,30 +461,6 @@ class ShelfAuditDocxTests(unittest.TestCase):
                 self.assertFalse(doc.element.xpath('//w:br[@w:type="page"]'))
                 self.assertEqual(len(doc.sections), 1)
                 self.assertGreaterEqual(doc.styles["Normal"].font.size.pt, MIN_BODY_FONT_SIZE)
-
-    def test_dynamic_tuning_and_long_report_can_flow_without_truncation(self):
-        result = completed_result(3)
-        for opportunity in result.opportunities:
-            opportunity.evidence = "Synthetic merchandising evidence with clear test wording. " * 6
-            opportunity.recommendation = "Synthetic recommendation for testing report layout only. " * 4
-        report = build_report(result, audit_photo=photo_bytes())
-        self.assertNotEqual(select_layout(report), LAYOUT_PRESETS[0])
-        self.assertGreaterEqual(select_layout(report).body_size, MIN_BODY_FONT_SIZE)
-        result = completed_result(8)
-        for index, item in enumerate(result.opportunities):
-            item.evidence = f"Long test section {index}. " * 100
-        report = build_report(result, audit_photo=photo_bytes())
-        layout = select_layout(report)
-        self.assertGreater(estimate_report_height(report, layout), (11 - HEADER_TOP_MARGIN - layout.margin) * 72)
-        data = render_docx(report)
-        text = docx_text(data)
-        for item in report.opportunities:
-            self.assertIn(item.evidence, text)
-            self.assertIn(item.recommendation, text)
-        doc = Document(BytesIO(data))
-        approval = next(p for p in doc.paragraphs if p.text.startswith("Signature:"))
-        self.assertTrue(approval.paragraph_format.keep_with_next)
-        self.assertTrue(approval.paragraph_format.keep_together)
 
     def test_docx_ui_does_not_import_audit_provider_pdf_or_preview(self):
         script = '''
