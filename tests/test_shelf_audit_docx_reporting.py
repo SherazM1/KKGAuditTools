@@ -10,6 +10,8 @@ import sys
 import tempfile
 import textwrap
 import unittest
+import uuid
+from xml.etree import ElementTree as ET
 from unittest.mock import Mock, patch
 from zipfile import ZipFile
 from zoneinfo import ZoneInfo
@@ -210,17 +212,94 @@ class ShelfAuditDocxTests(unittest.TestCase):
         names = set(package.namelist())
         self.assertIn("word/fontTable.xml", names)
         self.assertIn("word/_rels/fontTable.xml.rels", names)
-        self.assertIn("word/fonts/Gotham-Medium.ttf", names)
-        self.assertIn("word/fonts/Gotham-Bold.ttf", names)
-        self.assertIn("word/fonts/Gotham-Black.ttf", names)
+        self.assertIn("word/fonts/Gotham-Medium.odttf", names)
+        self.assertIn("word/fonts/Gotham-Bold.odttf", names)
+        self.assertIn("word/fonts/Gotham-Black.odttf", names)
         document_rels = package.read("word/_rels/document.xml.rels").decode("utf-8")
         self.assertIn("fontTable.xml", document_rels)
         font_table = package.read("word/fontTable.xml").decode("utf-8")
         for family_name in expected_names:
             self.assertIn(family_name, font_table)
-        self.assertIn("Gotham-Medium.ttf", package.read("word/_rels/fontTable.xml.rels").decode("utf-8"))
-        self.assertIn("Gotham-Bold.ttf", package.read("word/_rels/fontTable.xml.rels").decode("utf-8"))
-        self.assertIn("Gotham-Black.ttf", package.read("word/_rels/fontTable.xml.rels").decode("utf-8"))
+        self.assertIn("Gotham-Medium.odttf", package.read("word/_rels/fontTable.xml.rels").decode("utf-8"))
+        self.assertIn("Gotham-Bold.odttf", package.read("word/_rels/fontTable.xml.rels").decode("utf-8"))
+        self.assertIn("Gotham-Black.odttf", package.read("word/_rels/fontTable.xml.rels").decode("utf-8"))
+
+
+    def test_obfuscated_font_keys_permissions_and_package_integrity(self):
+        from shelf_audit.reporting.font_embedding import (
+            discover_font_assets, inspect_font, embed_report_fonts, NS_W, NS_R, NS_PKG_REL, NS_CT,
+        )
+        data = render_docx(build_report(completed_result(3), audit_photo=photo_bytes()))
+        with ZipFile(BytesIO(data)) as package:
+            self.assertIsNone(package.testzip())
+            self.assertEqual(len(package.namelist()), len(set(package.namelist())))
+            self.assertFalse(any(name.endswith('.ttf') for name in package.namelist()))
+            table = ET.fromstring(package.read('word/fontTable.xml'))
+            rels = ET.fromstring(package.read('word/_rels/fontTable.xml.rels'))
+            targets = {rel.get('Id'): 'word/' + rel.get('Target') for rel in rels}
+            self.assertEqual(len(targets), 3)
+            self.assertEqual(len(set(targets.values())), 3)
+            for rel in rels:
+                self.assertEqual(rel.get('Type'), NS_R + '/font')
+            types = ET.fromstring(package.read('[Content_Types].xml'))
+            overrides = {item.get('PartName'): item.get('ContentType') for item in types.findall('{'+NS_CT+'}Override')}
+            for family, path in discover_font_assets().items():
+                info = inspect_font(path)
+                self.assertEqual(info['family_name'], family)
+                self.assertEqual(info['full_name'], family)
+                self.assertEqual(info['fs_type'], 0x0104)
+                self.assertTrue(info['embed_allowed'])
+                entry = next(item for item in table if item.get('{'+NS_W+'}name') == info['family_name'])
+                role = 'embedRegular' if family == 'Gotham Medium' else 'embedBold'
+                reference = entry.find('{'+NS_W+'}'+role)
+                key = uuid.UUID(reference.get('{'+NS_W+'}fontKey')).bytes[::-1]
+                part = targets[reference.get('{'+NS_R+'}id')]
+                self.assertEqual(overrides['/'+part], 'application/vnd.openxmlformats-officedocument.obfuscatedFont')
+                embedded = package.read(part)
+                original = path.read_bytes()
+                self.assertNotEqual(embedded[:32], original[:32])
+                recovered = bytes(value ^ key[index % 16] for index, value in enumerate(embedded[:32])) + embedded[32:]
+                self.assertEqual(recovered, original)
+                self.assertEqual(reference.get('{'+NS_W+'}subsetted'), 'false')
+            repeated = embed_report_fonts(data)
+            with ZipFile(BytesIO(repeated)) as again:
+                self.assertEqual(set(package.namelist()), set(again.namelist()))
+                for name in package.namelist():
+                    self.assertEqual(package.read(name), again.read(name), name)
+            with patch('shelf_audit.reporting.docx_renderer.embed_report_fonts', side_effect=lambda value: value):
+                plain = render_docx(build_report(completed_result(3), audit_photo=photo_bytes()))
+            with ZipFile(BytesIO(plain)) as before:
+                for name in before.namelist():
+                    if name not in ('[Content_Types].xml', 'word/_rels/document.xml.rels', 'word/fontTable.xml'):
+                        self.assertEqual(before.read(name), package.read(name), name)
+
+    def test_embedding_flags_reject_restricted_and_bitmap_only_fonts(self):
+        from shelf_audit.reporting.font_embedding import discover_font_assets, inspect_font, embed_report_fonts
+        source = discover_font_assets()['Gotham Medium']
+        for flags, allowed in ((0, True), (2, False), (4, True), (8, True), (0x104, True), (0x204, False)):
+            with self.subTest(flags=flags), tempfile.TemporaryDirectory() as directory:
+                target = Path(directory) / 'unrelated-filename.ttf'
+                with TTFont(str(source)) as font:
+                    font['OS/2'].fsType = flags
+                    font.save(target)
+                info = inspect_font(target)
+                self.assertEqual(info['family_name'], 'Gotham Medium')
+                self.assertEqual(info['fs_type'], flags)
+                self.assertEqual(info['embed_allowed'], allowed)
+                if not allowed:
+                    plain = BytesIO()
+                    Document().save(plain)
+                    with self.assertLogs('shelf_audit.reporting.font_embedding', level='WARNING') as logs:
+                        result = embed_report_fonts(plain.getvalue(), font_paths={'Gotham Medium': target})
+                    self.assertEqual(result, plain.getvalue())
+                    self.assertIn(f'fsType={flags}', '\n'.join(logs.output))
+
+    def test_obfuscation_uses_textual_guid_reverse_order(self):
+        from shelf_audit.reporting.font_embedding import _obfuscate_font
+        # Fixed independent vector catches UUID little-endian/mixed-endian mistakes.
+        key = '{00112233-4455-6677-8899-AABBCCDDEEFF}'
+        expected = bytes.fromhex('ffeeddccbbaa99887766554433221100') * 2
+        self.assertEqual(_obfuscate_font(bytes(32) + b'unchanged', key), expected + b'unchanged')
 
     def test_header_sizes_dividers_and_signature_only(self):
         doc = Document(BytesIO(render_docx(build_report(completed_result(3)))))
@@ -255,7 +334,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
             self.assertEqual(len(doc.tables), 0)
             self.assertIn("Visible evidence 0.", "\n".join(p.text for p in doc.paragraphs))
 
-    def test_gotham_faces_in_expected_roles_and_no_embedded_fonts(self):
+    def test_gotham_faces_in_expected_roles_and_embedded_fonts(self):
         result = completed_result(1)
         report = build_report(result, metadata=ReportMetadata(
             client="Test Client", retailer="Test Retailer", location="Test Location",
@@ -298,7 +377,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
             assert_font(paragraph.runs[1], "Gotham Medium")
         assert_font(doc.sections[0].footer.paragraphs[0].runs[0], "Gotham Medium")
         with ZipFile(BytesIO(data)) as package:
-            self.assertTrue(any(name.startswith("word/fonts/") and name.endswith(".ttf") for name in package.namelist()))
+            self.assertTrue(any(name.startswith("word/fonts/") and name.endswith(".odttf") for name in package.namelist()))
             self.assertIn("word/fontTable.xml", package.namelist())
 
     def test_footer_year_is_calculated_at_render_time_without_mutating_report(self):
