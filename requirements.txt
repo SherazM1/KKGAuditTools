@@ -4,6 +4,7 @@ streamlit-drawable-canvas==0.13.0
 openai
 reportlab>=4.4,<5  # Deterministic Shelf Audit PDF reports.
 python-docx>=1.2,<2  # Editable Shelf Audit reports; no Office installation needed.
+fonttools>=4.53,<5  # Inspect Gotham font metadata before embedding in DOCX reports.
 
 # Display Compliance classical region detection.
 opencv-python-headless>=4.10.0
