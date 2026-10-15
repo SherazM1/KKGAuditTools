@@ -55,7 +55,7 @@ def docx_text(data):
     for section in doc.sections:
         paragraphs.extend(section.header.paragraphs)
         paragraphs.extend(section.footer.paragraphs)
-        for table in section.header.tables:
+        for table in (*section.header.tables, *section.footer.tables):
             for row in table.rows:
                 for cell in row.cells:
                     paragraphs.extend(cell.paragraphs)
@@ -160,10 +160,11 @@ class ShelfAuditDocxTests(unittest.TestCase):
         self.assertEqual(top_rule.get(qn('w:color')), '141638')
         headings = [p for p in opportunity_copy if p.text[:2].isdigit()]
         for heading in headings[1:]:
-            border = heading._p.pPr.find(qn('w:pBdr')).find(qn('w:top'))
+            divider = heading._p.getprevious()
+            border = divider.find(qn('w:pPr')).find(qn('w:pBdr')).find(qn('w:top'))
             self.assertEqual(border.get(qn('w:sz')), '4')
             self.assertEqual(border.get(qn('w:color')), '141638')
-            self.assertEqual(heading.paragraph_format.space_before.pt, 12)
+            self.assertEqual(heading.paragraph_format.space_before.pt, 11)
         formats = []
         for count in (1,2,3,4):
             document = Document(BytesIO(render_docx(build_report(completed_result(count)))))
@@ -177,20 +178,62 @@ class ShelfAuditDocxTests(unittest.TestCase):
             self.assertFalse(any(p.text.startswith(('Signature:', 'Date:')) for p in doc.paragraphs))
             section = doc.sections[0]
             self.assertEqual(section.bottom_margin.inches, 1)
-            signature, footer = section.footer.paragraphs
-            self.assertIn('Signature: __________________________', signature.text)
-            self.assertIn('\tDate: __________________________', signature.text)
-            self.assertEqual(signature.runs[0].font.name, BLACK_FONT)
-            self.assertEqual(signature.runs[3].font.name, BLACK_FONT)
-            self.assertEqual(signature.runs[0].font.size.pt, 10)
-            tab = signature._p.pPr.find(qn('w:tabs'))[0]
-            self.assertEqual(tab.get(qn('w:val')), 'right')
+            table = section.footer.tables[0]
+            self.assertEqual(len(table.rows), 1)
+            self.assertFalse(table.autofit)
+            cells = table.rows[0].cells
+            self.assertEqual([cell.text for cell in cells], ['Signature:', '', '', 'Date:', ''])
+            for index in (0,3):
+                run = cells[index].paragraphs[0].runs[0]
+                self.assertEqual(run.font.name, BLACK_FONT)
+                self.assertEqual(run.font.size.pt, 10)
+                self.assertEqual(cells[index].paragraphs[0].paragraph_format.line_spacing.pt, 14)
+            for index in (1,4):
+                self.assertAlmostEqual(cells[index].width.inches, 2.1, places=3)
+                border = cells[index]._tc.tcPr.find(qn('w:tcBorders')).find(qn('w:bottom'))
+                self.assertEqual(border.get(qn('w:val')), 'single')
+                self.assertEqual(border.get(qn('w:sz')), '4')
+                self.assertEqual(border.get(qn('w:color')), '141638')
+            self.assertNotIn('_', ''.join(cell.text for cell in cells))
+            self.assertNotIn('Approved By', ''.join(cell.text for cell in cells))
+            spacer, separator, footer = section.footer.paragraphs
+            self.assertEqual(spacer.paragraph_format.line_spacing.pt, 1)
+            self.assertEqual(separator.paragraph_format.space_before.pt, 8)
+            self.assertEqual(separator.paragraph_format.space_after.pt, 10)
+            self.assertEqual(separator.paragraph_format.line_spacing.pt, 1)
+            self.assertEqual(separator._p.pPr.find(qn('w:pBdr'))[0].get(qn('w:space')), '0')
             self.assertEqual(footer.alignment, 1)
             self.assertEqual(footer.runs[0].font.name, BOOK_FONT)
             self.assertEqual(footer.runs[0].font.size.pt, 8)
             self.assertAlmostEqual(section.footer_distance.inches, .18, places=3)
             zones.append(str(section.footer._element.xml))
         self.assertEqual(len(set(zones)), 1)
+
+    def test_opportunity_rhythm_and_divider_gaps_are_fixed_for_all_counts(self):
+        for count in (1,2,3,4):
+            report = build_report(completed_result(count), audit_photo=photo_bytes())
+            doc = Document(BytesIO(render_docx(report)))
+            rhythms = []
+            for item in report.opportunities:
+                start = next(i for i,p in enumerate(doc.paragraphs) if p.text == f'{item.number:02d} {item.title}')
+                paragraphs = doc.paragraphs[start:start+5]
+                self.assertEqual([p.text for p in paragraphs[1::2]], ['WHY','RECOMMENDATION'])
+                before = [p.paragraph_format.space_before.pt for p in paragraphs]
+                after = [p.paragraph_format.space_after.pt for p in paragraphs]
+                self.assertEqual(before, [11,0,0,0,0])
+                self.assertEqual(after, [9,1,10,1,13])
+                rhythms.append((before,after))
+                if item.number > 1:
+                    divider = doc.paragraphs[start-1]
+                    self.assertEqual(divider.text, '')
+                    self.assertEqual(divider.paragraph_format.line_spacing.pt, 1)
+                    self.assertEqual(divider.paragraph_format.space_before.pt, 0)
+                    self.assertEqual(divider.paragraph_format.space_after.pt, 0)
+                    border = divider._p.pPr.find(qn('w:pBdr'))[0]
+                    self.assertEqual(border.get(qn('w:space')), '0')
+                    self.assertEqual(border.get(qn('w:sz')), '4')
+                    self.assertEqual(doc.paragraphs[start-2].paragraph_format.space_after.pt, 13)
+            self.assertTrue(all(rhythm == rhythms[0] for rhythm in rhythms))
 
     def test_missing_book_is_an_explicit_dependency_error(self):
         with patch('shelf_audit.reporting.docx_renderer.discover_font_assets', return_value={}):
@@ -208,7 +251,7 @@ class ShelfAuditDocxTests(unittest.TestCase):
             self.assertIn(item.evidence, docx_text(data))
         doc = Document(BytesIO(data))
         self.assertEqual(doc.styles['Normal'].font.size.pt, 10)
-        self.assertIn('Signature:', doc.sections[0].footer.paragraphs[0].text)
+        self.assertIn('Signature:', doc.sections[0].footer.tables[0].cell(0,0).text)
 
 
     def test_image_orientation_does_not_change_opportunity_spacing_or_estimates(self):
@@ -387,8 +430,8 @@ class ShelfAuditDocxTests(unittest.TestCase):
                 self.assertIn(report.title, text)
                 self.assertIn(report.subtitle.upper(), text)
                 self.assertNotIn("Approved By", text)
-                self.assertIn("Signature: __________________________", text)
-                self.assertIn("Date: __________________________", text)
+                self.assertIn("Signature:", text)
+                self.assertIn("Date:", text)
                 if count == 0:
                     self.assertIn(NO_OPPORTUNITIES_TEXT, text)
 

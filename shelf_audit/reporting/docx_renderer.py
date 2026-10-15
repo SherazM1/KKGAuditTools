@@ -9,7 +9,7 @@ import textwrap
 from zoneinfo import ZoneInfo
 
 from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
@@ -44,8 +44,10 @@ LOGO_X, LOGO_Y, LOGO_WIDTH = 6.82, 0.40, 1.05
 
 @dataclass(frozen=True)
 class DocxLayout:
-    section_spacing: float = 12
-    body_spacing: float = 12
+    section_spacing: float = 11
+    body_spacing: float = 10
+    title_spacing: float = 9
+    recommendation_spacing: float = 13
     content_spacing: float = 20
     signature_spacing: float = 0
     metadata_spacing: float = 0
@@ -88,9 +90,9 @@ def photo_box_width(layout: DocxLayout) -> float:
 def _opportunity_height(item: ReportOpportunity, layout: DocxLayout, width: float) -> float:
     return (
         _line_count(f"{item.number:02d} {item.title}", width, layout.title_size) * 14
-        + 12 + 2 * (13 + 1)
+        + layout.title_spacing + 2 * (13 + 1)
         + sum(_line_count(value, width, layout.body_size) * 12 for value in (item.evidence, item.recommendation))
-        + layout.section_spacing + 2 * layout.body_spacing
+        + layout.section_spacing + 1 + layout.body_spacing + layout.recommendation_spacing
     )
 
 
@@ -132,10 +134,10 @@ def _set_tracking(run: Run, points: float = TRACKING_PT) -> None:
     spacing.set(qn("w:val"), str(round(points * 20)))
 
 
-def _rule(paragraph: Paragraph, edge: str = "top") -> None:
+def _rule(paragraph: Paragraph, edge: str = "top", *, space: int = 6) -> None:
     borders = OxmlElement("w:pBdr")
     border = OxmlElement(f"w:{edge}")
-    for key, value in (("val", "single"), ("sz", "4"), ("space", "6"), ("color", NAVY.lstrip("#"))):
+    for key, value in (("val", "single"), ("sz", "4"), ("space", str(space)), ("color", NAVY.lstrip("#"))):
         border.set(qn(f"w:{key}"), value)
     borders.append(border)
     paragraph._p.get_or_add_pPr().append(borders)
@@ -335,35 +337,57 @@ def render_docx(report: ShelfOpportunityReport, *, logo_path: Path | None = DEFA
                          after=after, blue=blue, tracked=tracked, keep_next=keep_next)
         paragraph.paragraph_format.right_indent = Inches(width - text_width)
         if divider:
-            _rule(paragraph)
+            _rule(paragraph, space=0)
         cursor += _line_count(text, text_width * 72, size) * line + after
         previous_after = after
         return paragraph
 
     for index, item in enumerate(report.opportunities):
+        if index:
+            # A 1pt rule paragraph separates the 13pt copy gap from the 11pt
+            # title gap, so Word cannot collapse both gaps into a single one.
+            add_copy("", line=1, divider=True, keep_next=True)
         add_copy(f"{item.number:02d} {item.title}", font=BLACK_FONT, size=12, line=14,
-                 before=layout.section_spacing, after=12,
-                 keep_next=True, divider=index > 0)
+                 before=layout.section_spacing, after=layout.title_spacing,
+                 keep_next=True)
         for label, text in ((WHY_LABEL, item.evidence), (RECOMMENDATION_LABEL, item.recommendation)):
             add_copy(label.upper(), font=BOLD_FONT, size=11, line=13, after=1,
                      blue=True, tracked=True, keep_next=True)
-            add_copy(text, after=layout.body_spacing)
+            add_copy(text, after=layout.body_spacing if label == WHY_LABEL else layout.recommendation_spacing)
     if not report.opportunities:
         document.add_paragraph(NO_OPPORTUNITIES_TEXT)
 
-    # Footer content reserves a stable bottom zone on every page, independent of
-    # finding count. A right-aligned tab keeps both editable blanks on one row.
-    signature = section.footer.paragraphs[0]
-    signature.paragraph_format.tab_stops.add_tab_stop(Inches(width), WD_TAB_ALIGNMENT.RIGHT)
-    signature.add_run("Signature: ")
-    signature.add_run("__________________________")
-    signature.add_run("\t")
-    signature.add_run("Date: ")
-    signature.add_run("__________________________")
-    format_paragraph(signature, font=BOOK_FONT, size=10, line=14, after=18)
-    _set_font(signature.runs[0], BLACK_FONT)
-    _set_font(signature.runs[3], BLACK_FONT)
-    _rule(signature, "bottom")
+    # One stable footer row: editable blank cells carry real, equal-length rules.
+    format_paragraph(section.footer.paragraphs[0], line=1)
+    signature = section.footer.add_table(rows=1, cols=5, width=Inches(width))
+    signature.autofit = False
+    for index, (column, cell, inches) in enumerate(zip(
+        signature.columns, signature.rows[0].cells, (0.90, 2.10, width - 5.74, 0.64, 2.10),
+    )):
+        column.width = cell.width = Inches(inches)
+        properties = cell._tc.get_or_add_tcPr()
+        margins = OxmlElement("w:tcMar")
+        for edge in ("top", "left", "bottom", "right"):
+            margin = OxmlElement(f"w:{edge}")
+            margin.set(qn("w:w"), "0")
+            margin.set(qn("w:type"), "dxa")
+            margins.append(margin)
+        properties.append(margins)
+        paragraph = cell.paragraphs[0]
+        if index in (0, 3):
+            paragraph.add_run("Signature:" if index == 0 else "Date:")
+        format_paragraph(paragraph, font=BLACK_FONT if index in (0, 3) else BOOK_FONT,
+                         size=10, line=14)
+        if index in (1, 4):
+            borders = OxmlElement("w:tcBorders")
+            border = OxmlElement("w:bottom")
+            for key, value in (("val", "single"), ("sz", "4"), ("space", "0"), ("color", NAVY.lstrip("#"))):
+                border.set(qn(f"w:{key}"), value)
+            borders.append(border)
+            properties.append(borders)
+    separator = section.footer.add_paragraph()
+    format_paragraph(separator, line=1, before=8, after=10)
+    _rule(separator, space=0)
     footer = section.footer.add_paragraph()
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     footer.add_run(f"{report.footer_text} {datetime.now(ZoneInfo('America/Chicago')).year}")
