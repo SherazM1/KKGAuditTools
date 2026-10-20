@@ -116,9 +116,18 @@ class _StopRender(Exception):
     pass
 
 
+class _FakeContext:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return False
+
+
 class _FakeDisplayComplianceStorage:
     def __init__(self, baselines: list[DisplayBaseline]) -> None:
         self._baselines = baselines
+        self.listing_errors: list[dict[str, str]] = []
         self.saved_metadata: list[DisplayBaseline] = []
         self.loaded_images: list[str] = []
 
@@ -135,6 +144,14 @@ class _FakeDisplayComplianceStorage:
         self.loaded_images.append(baseline.baseline_id)
         return _png_bytes(10, 8)
 
+    def load_side_reference_image_bytes(
+        self,
+        baseline: DisplayBaseline,
+        side_id: str,
+    ) -> bytes:
+        self.loaded_images.append(f"{baseline.baseline_id}:{side_id}")
+        return _png_bytes(10, 8)
+
     def save_baseline_metadata(self, baseline: DisplayBaseline) -> None:
         self.saved_metadata.append(baseline)
 
@@ -145,11 +162,15 @@ class _FakeStreamlit:
         *,
         session_state: dict[str, object] | None = None,
         clicked_buttons: set[str] | None = None,
+        uploads: dict[str, object] | None = None,
     ) -> None:
         self.session_state = session_state or {}
         self.clicked_buttons = clicked_buttons or set()
+        self.uploads = uploads or {}
         self.selectbox_calls: list[dict[str, object]] = []
         self.button_calls: list[dict[str, object]] = []
+        self.checkbox_calls: list[dict[str, object]] = []
+        self.image_calls: list[dict[str, object]] = []
         self.info_messages: list[str] = []
         self.errors: list[str] = []
 
@@ -157,6 +178,11 @@ class _FakeStreamlit:
         key = str(kwargs.get("key", label))
         self.button_calls.append({"label": label, **kwargs})
         return key in self.clicked_buttons and not bool(kwargs.get("disabled", False))
+
+    def checkbox(self, label: str, **kwargs: object) -> bool:
+        self.checkbox_calls.append({"label": label, **kwargs})
+        key = str(kwargs.get("key", label))
+        return bool(self.session_state.get(key, kwargs.get("value", False)))
 
     def selectbox(self, label: str, *, options: list[object], key: str, **kwargs: object) -> object:
         self.selectbox_calls.append({"label": label, "options": options, "key": key, **kwargs})
@@ -167,16 +193,30 @@ class _FakeStreamlit:
         return value
 
     def text_input(self, *args: object, **kwargs: object) -> str:
-        return ""
+        key = kwargs.get("key")
+        return str(self.session_state.get(key, kwargs.get("value", "")))
 
-    def file_uploader(self, *args: object, **kwargs: object) -> None:
-        return None
+    def text_area(self, *args: object, **kwargs: object) -> str:
+        key = kwargs.get("key")
+        return str(self.session_state.get(key, kwargs.get("value", "")))
+
+    def radio(self, label: str, options: list[object], **kwargs: object) -> object:
+        key = kwargs.get("key")
+        value = self.session_state.get(key, options[0])
+        return value if value in options else options[0]
+
+    def number_input(self, *args: object, **kwargs: object) -> object:
+        key = kwargs.get("key")
+        return self.session_state.get(key, kwargs.get("value", 0))
+
+    def file_uploader(self, *args: object, **kwargs: object) -> object:
+        return self.uploads.get(str(kwargs.get("key")))
 
     def dataframe(self, *args: object, **kwargs: object) -> None:
         return None
 
     def image(self, *args: object, **kwargs: object) -> None:
-        return None
+        self.image_calls.append({"args": args, **kwargs})
 
     def metric(self, *args: object, **kwargs: object) -> None:
         return None
@@ -189,6 +229,27 @@ class _FakeStreamlit:
 
     def caption(self, *args: object, **kwargs: object) -> None:
         return None
+
+    def write(self, *args: object, **kwargs: object) -> None:
+        return None
+
+    def expander(self, *args: object, **kwargs: object) -> _FakeContext:
+        return _FakeContext()
+
+    def spinner(self, *args: object, **kwargs: object) -> _FakeContext:
+        return _FakeContext()
+
+    def form(self, *args: object, **kwargs: object) -> _FakeContext:
+        return _FakeContext()
+
+    def columns(self, count: int) -> list["_FakeColumn"]:
+        return [_FakeColumn(self) for _ in range(count)]
+
+    def rerun(self) -> None:
+        return None
+
+    def form_submit_button(self, label: str, **kwargs: object) -> bool:
+        return label in self.clicked_buttons and not kwargs.get("disabled", False)
 
     def success(self, *args: object, **kwargs: object) -> None:
         return None
@@ -204,6 +265,17 @@ class _FakeStreamlit:
 
     def stop(self) -> None:
         raise _StopRender
+
+
+class _FakeColumn:
+    def __init__(self, parent: _FakeStreamlit) -> None:
+        self.parent = parent
+
+    def number_input(self, *args: object, **kwargs: object) -> object:
+        return self.parent.number_input(*args, **kwargs)
+
+    def text_input(self, *args: object, **kwargs: object) -> str:
+        return self.parent.text_input(*args, **kwargs)
 
 
 def _baseline_for_page(baseline_id: str = "baseline-1") -> DisplayBaseline:
@@ -287,6 +359,7 @@ def _render_page_with_fakes(
         lambda **kwargs: _empty_diagnostic_result(),
     )
     monkeypatch.setattr(display_page, "render_annotated_preview", lambda **kwargs: b"preview")
+    monkeypatch.setattr(display_page, "_mapping_preview", lambda **kwargs: b"preview")
 
     display_page.render_display_compliance_view()
 
@@ -298,8 +371,11 @@ def test_display_compliance_renders_when_no_saved_baselines_exist(
 ) -> None:
     fake_st, fake_storage = _render_page_with_fakes(monkeypatch, baselines=[])
 
-    assert fake_st.selectbox_calls == []
-    assert "No saved baselines yet. Create a baseline above to begin." in fake_st.info_messages
+    assert not any(
+        call["label"] == "Select Display"
+        for call in fake_st.selectbox_calls
+    )
+    assert "Create a draft baseline above to begin." in fake_st.info_messages
     assert fake_storage.loaded_images == []
 
 
@@ -312,8 +388,12 @@ def test_display_compliance_placeholder_selection_does_not_lookup_or_detect(
         session_state={"display_compliance_selected_baseline_id": None},
     )
 
-    assert fake_st.selectbox_calls[0]["options"][0] is None
-    assert "Select a saved baseline to detect candidate product regions." in fake_st.info_messages
+    saved_display_selector = next(
+        call
+        for call in fake_st.selectbox_calls
+        if call["label"] == "Select Display"
+    )
+    assert saved_display_selector["options"][0] is None
     assert fake_storage.loaded_images == []
 
 
@@ -327,9 +407,17 @@ def test_display_compliance_uses_valid_baseline_id_selection(
         session_state={"display_compliance_selected_baseline_id": baseline.baseline_id},
     )
 
-    assert fake_st.selectbox_calls[0]["options"] == [None, baseline.baseline_id]
-    assert any(call["key"] == "display_compliance_detect_product_regions" for call in fake_st.button_calls)
-    assert fake_storage.loaded_images == []
+    saved_display_selector = next(
+        call
+        for call in fake_st.selectbox_calls
+        if call["label"] == "Select Display"
+    )
+    assert saved_display_selector["options"] == [None, baseline.baseline_id]
+    assert any(
+        call["label"] == "Generate Candidate Positions"
+        for call in fake_st.button_calls
+    )
+    assert fake_storage.loaded_images == [baseline.baseline_id]
 
 
 def test_display_compliance_sanitizes_stale_selected_baseline_before_selectbox(
@@ -347,8 +435,6 @@ def test_display_compliance_sanitizes_stale_selected_baseline_before_selectbox(
     )
 
     assert fake_st.session_state.get("display_compliance_selected_baseline_id") is None
-    assert "display_compliance_annotated_preview_baseline_id" not in fake_st.session_state
-    assert "display_compliance_annotated_preview_bytes" not in fake_st.session_state
     assert fake_storage.loaded_images == []
 
 
@@ -356,19 +442,21 @@ def test_display_compliance_valid_selection_permits_detection_and_rerun(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     baseline = _baseline_for_page()
+    context = (baseline.baseline_id, baseline.revision, None, "")
+    draft_key = (
+        f"display_compliance_mapping_draft_{baseline.baseline_id}_legacy"
+    )
     fake_st, fake_storage = _render_page_with_fakes(
         monkeypatch,
         baselines=[baseline],
         session_state={"display_compliance_selected_baseline_id": baseline.baseline_id},
-        clicked_buttons={"display_compliance_detect_product_regions"},
+        clicked_buttons={f"display_compliance_generate_{context}"},
     )
 
     assert fake_storage.loaded_images == [baseline.baseline_id]
-    assert fake_storage.saved_metadata
-    assert (
-        fake_st.session_state["display_compliance_annotated_preview_baseline_id"]
-        == baseline.baseline_id
-    )
+    assert draft_key in fake_st.session_state
+    assert fake_st.session_state[draft_key]["source_metadata"]["revision"] == 1
+    assert not fake_storage.saved_metadata
 
 
 def test_display_compliance_leaves_global_navigation_to_hub(
