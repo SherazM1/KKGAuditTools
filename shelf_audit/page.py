@@ -23,6 +23,7 @@ from .image_utils import (
     normalize_target_region,
     crop_target_region,
     get_image_dimensions,
+    hash_image,
     preprocess_audit_image,
 )
 from .models import AuditMode, AuditDepth
@@ -38,8 +39,52 @@ from .reporting.ui import render_report_section
 # Canvas helpers
 # ---------------------------------------------------------
 
-MAX_CANVAS_WIDTH = 700
-MAX_CANVAS_HEIGHT = 700
+# The component uses a pixel-sized canvas rather than container-width sizing.
+# Keep it within a normal phone's content column without changing its events
+# or introducing a separate display-to-image coordinate system.
+MAX_CANVAS_WIDTH = 280
+MAX_CANVAS_HEIGHT = 560
+
+
+def _clear_completed_audit(state) -> None:
+    for key in (
+        "shelf_audit_completed_result",
+        "shelf_audit_report_document",
+        "shelf_audit_completed_photo",
+    ):
+        state.pop(key, None)
+
+
+def _clear_expanded_target(state) -> None:
+    """Remount the component so its rectangle/history cannot survive a reset.
+
+    Target coordinates and crop previews are derived locally from this
+    component on each run; there is no separately retained crop to restore.
+    """
+    old_key = state.pop("shelf_audit_target_canvas_key", None)
+    if old_key is not None:
+        state.pop(old_key, None)
+    state["shelf_audit_target_generation"] = (
+        state.get("shelf_audit_target_generation", 0) + 1
+    )
+
+
+def _sync_audit_context(state, image_id: str | None, mode: AuditMode) -> None:
+    """Invalidate only image/mode-dependent UI state, not audit infrastructure."""
+    context = (image_id, mode.value)
+    previous = state.get("shelf_audit_active_context")
+    if previous is not None and previous != context:
+        _clear_expanded_target(state)
+        _clear_completed_audit(state)
+    state["shelf_audit_active_context"] = context
+
+
+def _expanded_canvas_key(state, image_id: str) -> str:
+    """Bind drawing state to the prepared image and current reset generation."""
+    generation = state.get("shelf_audit_target_generation", 0)
+    key = f"shelf_audit_expanded_target_canvas_{image_id}_{generation}"
+    state["shelf_audit_target_canvas_key"] = key
+    return key
 
 
 def _fit_canvas_dimensions(
@@ -354,11 +399,14 @@ def render():
             )
 
         except Exception as exc:
+            _sync_audit_context(st.session_state, None, audit_mode)
             st.error(
                 f"The image could not be prepared: {exc}"
             )
             st.stop()
 
+        image_id = hash_image(audit_image)
+        _sync_audit_context(st.session_state, image_id, audit_mode)
 
         # -----------------------------------------------------
         # Product mode
@@ -410,6 +458,14 @@ def render():
             # Register the component only within a running Streamlit page.
             from streamlit_drawable_canvas import st_canvas
 
+            if st.button(
+                "Clear target",
+                key="shelf_audit_clear_target",
+                use_container_width=True,
+            ):
+                _clear_expanded_target(st.session_state)
+                _clear_completed_audit(st.session_state)
+
             canvas_result = st_canvas(
                 fill_color="rgba(255, 0, 0, 0.15)",
                 stroke_width=3,
@@ -421,7 +477,7 @@ def render():
                 drawing_mode="rect",
                 background_image_fit="stretch",
                 return_image_data=False,
-                key="shelf_audit_expanded_target_canvas",
+                key=_expanded_canvas_key(st.session_state, image_id),
             )
 
 
@@ -507,7 +563,7 @@ def render():
                         st.image(
                             target_crop.data,
                             caption="Selected target product",
-                            use_container_width=False,
+                            use_container_width=True,
                         )
 
                 except Exception as exc:
@@ -546,9 +602,7 @@ def render():
 
         if analyze:
 
-            st.session_state.pop("shelf_audit_completed_result", None)
-            st.session_state.pop("shelf_audit_report_document", None)
-            st.session_state.pop("shelf_audit_completed_photo", None)
+            _clear_completed_audit(st.session_state)
 
             try:
 
@@ -637,6 +691,9 @@ def render():
             # Retain the exact upload/camera bytes, not the processed audit image
             # or Expanded-mode crop. Associate them only with this successful run.
             st.session_state["shelf_audit_completed_photo"] = image_bytes
+
+    else:
+        _sync_audit_context(st.session_state, None, audit_mode)
 
     # Persist successful final results across report form/download reruns.
     result = st.session_state.get("shelf_audit_completed_result")

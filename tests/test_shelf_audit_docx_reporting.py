@@ -576,13 +576,14 @@ render()
             self.assertEqual(audit.call_count, 1)
             self.assertEqual(app.session_state["shelf_audit_completed_photo"], original)
             self.assertIn(original, media_bytes(download.call_args.kwargs["data"]))
-            # Changing the input doesn't change the photo associated with the
-            # completed result until another explicit Analyze Shelf action.
+            # A replacement input invalidates the prior result and download;
+            # the next explicit analysis associates its own original photo.
             uploaded.getvalue.return_value = replacement
             app.text_input(key="shelf_report_location").set_value("Test Store").run()
             self.assertEqual(len(app.exception), 0)
-            self.assertIn(original, media_bytes(download.call_args.kwargs["data"]))
-            self.assertNotIn(replacement, media_bytes(download.call_args.kwargs["data"]))
+            self.assertNotIn("shelf_audit_completed_result", app.session_state)
+            self.assertNotIn("shelf_audit_completed_photo", app.session_state)
+            self.assertEqual(len(app.get("download_button")), 0)
             self.assertEqual(audit.call_count, 1)
             self.assertEqual(provider.call_count, 1)
             provider.return_value.analyze.assert_not_called()
