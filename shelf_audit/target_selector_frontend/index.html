@@ -1,0 +1,11 @@
+<!doctype html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{margin:0;font:16px system-ui;color:#31333f}#surface{position:relative;width:100%;line-height:0;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
+img{width:100%;height:auto;display:block;pointer-events:none}#box{position:absolute;box-sizing:border-box;border:3px solid #ff304f;background:#ff304f26;box-shadow:0 0 0 1px white;pointer-events:none;display:none}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}button{font:inherit;min-height:44px;padding:8px 16px;background:white;border:1px solid #888;border-radius:8px;cursor:pointer}#status{line-height:1.4;margin:8px 0}
+</style></head><body>
+<div id="surface" aria-label="Drag across the image to select the audit target"><img id="photo" alt="Prepared shelf photo" draggable="false"><div id="box"></div></div>
+<div class="controls"><button id="clear">Redraw target</button><button id="full">Use full image</button></div>
+<p id="status" role="status">Drag across the subject. Scroll outside the image.</p>
+<script src="selector.js"></script></body></html>

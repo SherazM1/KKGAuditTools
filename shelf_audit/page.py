@@ -20,13 +20,12 @@ from .criteria import load_criteria
 from .guardrails import GuardrailError
 from .image_utils import (
     build_audit_image,
-    normalize_target_region,
     crop_target_region,
-    get_image_dimensions,
     hash_image,
     preprocess_audit_image,
 )
 from .models import AuditMode, AuditDepth
+from .target_selector import select_target, parse_selection
 from .providers.base import ProviderConfigurationError
 from .providers.openai import OpenAIAuditProvider, OpenAIProviderConfig
 from .infrastructure.cache import MemoryAuditCache
@@ -38,13 +37,6 @@ from .reporting.ui import render_report_section
 # ---------------------------------------------------------
 # Canvas helpers
 # ---------------------------------------------------------
-
-# The component uses a pixel-sized canvas rather than container-width sizing.
-# Keep it within a normal phone's content column without changing its events
-# or introducing a separate display-to-image coordinate system.
-MAX_CANVAS_WIDTH = 280
-MAX_CANVAS_HEIGHT = 560
-
 
 def _clear_completed_audit(state) -> None:
     for key in (
@@ -64,6 +56,7 @@ def _clear_expanded_target(state) -> None:
     old_key = state.pop("shelf_audit_target_canvas_key", None)
     if old_key is not None:
         state.pop(old_key, None)
+    state.pop("shelf_audit_active_target", None)
     state["shelf_audit_target_generation"] = (
         state.get("shelf_audit_target_generation", 0) + 1
     )
@@ -87,126 +80,12 @@ def _expanded_canvas_key(state, image_id: str) -> str:
     return key
 
 
-def _fit_canvas_dimensions(
-    image_width: int,
-    image_height: int,
-) -> tuple[int, int]:
-    """
-    Fit the source image inside the Expanded-mode canvas
-    without changing its aspect ratio.
-    """
-
-    if image_width <= 0 or image_height <= 0:
-        raise ValueError(
-            "Image dimensions must be greater than zero."
-        )
-
-    scale = min(
-        MAX_CANVAS_WIDTH / image_width,
-        MAX_CANVAS_HEIGHT / image_height,
-        1.0,
-    )
-
-    canvas_width = max(
-        1,
-        round(image_width * scale),
-    )
-
-    canvas_height = max(
-        1,
-        round(image_height * scale),
-    )
-
-    return (
-        canvas_width,
-        canvas_height,
-    )
-
-
-def _extract_single_rectangle(
-    canvas_result,
-) -> dict | None:
-    """
-    Return the one rectangle currently drawn on the canvas.
-
-    Expanded mode intentionally supports exactly one active
-    target product.
-    """
-
-    if canvas_result.json_data is None:
-        return None
-
-    objects = canvas_result.json_data.get(
-        "objects",
-        [],
-    )
-
-    rectangles = [
-        obj
-        for obj in objects
-        if str(obj.get("type", "")).lower() == "rect"
-    ]
-
-    if len(rectangles) != 1:
-        return None
-
-    return rectangles[0]
-
-
-def _rectangle_coordinates(
-    rectangle: dict,
-) -> tuple[float, float, float, float]:
-    """
-    Resolve rectangle coordinates from Fabric.js canvas data.
-
-    Fabric retains the original width and height when an object
-    is resized, so scaleX and scaleY must also be applied.
-    """
-
-    x = float(
-        rectangle.get(
-            "left",
-            0.0,
-        )
-    )
-
-    y = float(
-        rectangle.get(
-            "top",
-            0.0,
-        )
-    )
-
-    width = float(
-        rectangle.get(
-            "width",
-            0.0,
-        )
-    ) * float(
-        rectangle.get(
-            "scaleX",
-            1.0,
-        )
-    )
-
-    height = float(
-        rectangle.get(
-            "height",
-            0.0,
-        )
-    ) * float(
-        rectangle.get(
-            "scaleY",
-            1.0,
-        )
-    )
-
-    return (
-        x,
-        y,
-        width,
-        height,
-    )
+def _sync_target(state, region) -> None:
+    """Invalidate completed work whenever the normalized subject changes."""
+    signature = None if region is None else (region.x, region.y, region.width, region.height)
+    if state.get("shelf_audit_active_target") != signature:
+        _clear_completed_audit(state)
+    state["shelf_audit_active_target"] = signature
 
 
 # ---------------------------------------------------------
@@ -439,142 +318,21 @@ def render():
                 "the audit to focus on."
             )
 
+            selection = select_target(
+                audit_image, key=_expanded_canvas_key(st.session_state, image_id)
+            )
             try:
-                image_width, image_height = get_image_dimensions(
-                    audit_image
-                )
-
-                canvas_width, canvas_height = _fit_canvas_dimensions(
-                    image_width,
-                    image_height,
-                )
-
+                target_region = parse_selection(selection)
+                if target_region is not None:
+                    target_crop = crop_target_region(audit_image, target_region)
+                    st.image(target_crop.data, caption="Selected target product", use_container_width=True)
+                else:
+                    st.info("Drag across the subject, or choose Use full image, to continue.")
             except Exception as exc:
-                st.error(
-                    f"The image dimensions could not be prepared: {exc}"
-                )
-                st.stop()
-
-            # Register the component only within a running Streamlit page.
-            from streamlit_drawable_canvas import st_canvas
-
-            if st.button(
-                "Clear target",
-                key="shelf_audit_clear_target",
-                use_container_width=True,
-            ):
-                _clear_expanded_target(st.session_state)
-                _clear_completed_audit(st.session_state)
-
-            canvas_result = st_canvas(
-                fill_color="rgba(255, 0, 0, 0.15)",
-                stroke_width=3,
-                stroke_color="#ff4b4b",
-                background_image=audit_image.data,
-                update_streamlit=True,
-                height=canvas_height,
-                width=canvas_width,
-                drawing_mode="rect",
-                background_image_fit="stretch",
-                return_image_data=False,
-                key=_expanded_canvas_key(st.session_state, image_id),
-            )
-
-
-            rectangle = _extract_single_rectangle(
-                canvas_result
-            )
-
-            canvas_objects = []
-
-            if canvas_result.json_data is not None:
-                canvas_objects = canvas_result.json_data.get(
-                    "objects",
-                    [],
-                )
-
-            rectangle_count = len(
-                [
-                    obj
-                    for obj in canvas_objects
-                    if str(obj.get("type", "")).lower() == "rect"
-                ]
-            )
-
-            if rectangle_count == 0:
-
-                st.info(
-                    "Draw one rectangle around the target product "
-                    "to continue."
-                )
-
-            elif rectangle_count > 1:
-
-                st.warning(
-                    "Expanded mode supports exactly one target product. "
-                    "Delete the extra rectangle(s) and keep only one."
-                )
-
-            elif rectangle is not None:
-
-                try:
-                    angle = float(
-                        rectangle.get(
-                            "angle",
-                            0.0,
-                        )
-                    )
-
-                    if abs(angle) > 0.01:
-                        st.warning(
-                            "Keep the target rectangle unrotated so the "
-                            "selected product can be mapped accurately."
-                        )
-
-                    else:
-
-                        (
-                            selection_x,
-                            selection_y,
-                            selection_width,
-                            selection_height,
-                        ) = _rectangle_coordinates(
-                            rectangle
-                        )
-
-                        target_region = normalize_target_region(
-                            x=selection_x,
-                            y=selection_y,
-                            width=selection_width,
-                            height=selection_height,
-                            canvas_width=canvas_width,
-                            canvas_height=canvas_height,
-                        )
-
-                        target_crop = crop_target_region(
-                            audit_image,
-                            target_region,
-                        )
-
-                        st.success(
-                            "Target product selected."
-                        )
-
-                        st.image(
-                            target_crop.data,
-                            caption="Selected target product",
-                            use_container_width=True,
-                        )
-
-                except Exception as exc:
-
-                    target_region = None
-                    target_crop = None
-
-                    st.warning(
-                        f"The selected target could not be prepared: {exc}"
-                    )
-
+                target_region = None
+                target_crop = None
+                st.warning(f"The selected target could not be prepared: {exc}")
+            _sync_target(st.session_state, target_region)
 
         # -----------------------------------------------------
         # Analyze
