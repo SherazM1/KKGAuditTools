@@ -565,6 +565,7 @@ render()
 ''')
         with (
             patch("shelf_audit.page.st.file_uploader", return_value=uploaded),
+            patch("shelf_audit.page.select_target", return_value=dict(x=0, y=0, width=1, height=1)),
             patch("shelf_audit.page.run_audit", side_effect=[first, second]) as audit,
             patch("shelf_audit.page.OpenAIAuditProvider") as provider,
             patch("shelf_audit.reporting.ui.st.download_button", wraps=st.download_button) as download,
@@ -605,6 +606,7 @@ render()
         app.session_state["shelf_audit_completed_photo"] = photo_bytes()
         with (
             patch("shelf_audit.page.st.camera_input", return_value=uploaded),
+            patch("shelf_audit.page.select_target", return_value=dict(x=0, y=0, width=1, height=1)),
             patch("shelf_audit.page.run_audit", side_effect=RuntimeError("test failure")),
             patch("shelf_audit.page.OpenAIAuditProvider"),
         ):

@@ -3,8 +3,7 @@ Shelf Audit Tool
 
 Current foundation:
 - camera or image upload
-- product / expanded audit modes
-- quick / deep audit depth
+- target-based UI using existing Expanded / Deep backend behavior
 - provider-neutral audit pipeline
 - ranked opportunities
 - target-region image helpers
@@ -15,7 +14,6 @@ Current foundation:
 import streamlit as st
 
 from .audit import run_audit
-from .audit_modes import get_mode_config, get_depth_config
 from .criteria import load_criteria
 from .guardrails import GuardrailError
 from .image_utils import (
@@ -145,65 +143,10 @@ def render():
         st.stop()
 
 
-    # ---------------------------------------------------------
-    # Audit mode
-    # ---------------------------------------------------------
-
-    st.subheader("Audit mode")
-
-    mode_label = st.radio(
-        "Choose the type of shelf audit:",
-        key="shelf_audit_mode",
-        options=[
-            "Product",
-            "Expanded",
-        ],
-        horizontal=True,
-    )
-
-    if mode_label == "Product":
-        audit_mode = AuditMode.PRODUCT
-    else:
-        audit_mode = AuditMode.EXPANDED
-
-    mode_config = get_mode_config(
-        audit_mode
-    )
-
-    st.caption(
-        mode_config.description
-    )
-
-
-    # ---------------------------------------------------------
-    # Audit depth
-    # ---------------------------------------------------------
-
-    st.subheader("Audit depth")
-
-    depth_label = st.radio(
-        "Choose how deep you want the audit to go:",
-        key="shelf_audit_depth",
-        options=[
-            "Quick Audit",
-            "Deep Audit",
-        ],
-        horizontal=True,
-    )
-
-    if depth_label == "Quick Audit":
-        audit_depth = AuditDepth.QUICK
-    else:
-        audit_depth = AuditDepth.DEEP
-
-    depth_config = get_depth_config(
-        audit_depth
-    )
-
-    st.caption(
-        depth_config.description
-    )
-
+    # Compatibility migration: only the page fixes these choices.
+    # Backend enums, configurations, fingerprints and telemetry stay intact.
+    audit_mode = AuditMode.EXPANDED
+    audit_depth = AuditDepth.DEEP
 
     # ---------------------------------------------------------
     # Image source
@@ -287,78 +230,41 @@ def render():
         image_id = hash_image(audit_image)
         _sync_audit_context(st.session_state, image_id, audit_mode)
 
-        # -----------------------------------------------------
-        # Product mode
-        # -----------------------------------------------------
-
         target_region = None
         target_crop = None
-
-        if audit_mode is AuditMode.PRODUCT:
-
-            st.image(
-                audit_image.data,
-                caption="Selected shelf image",
-                use_container_width=True,
-            )
-
-
-        # -----------------------------------------------------
-        # Expanded mode
-        # -----------------------------------------------------
-
-        else:
-
-            st.markdown(
-                "### Select target product"
-            )
-
-            st.caption(
-                "Draw one rectangle around the single product you want "
-                "the audit to focus on."
-            )
-
-            selection = select_target(
-                audit_image, key=_expanded_canvas_key(st.session_state, image_id)
-            )
-            try:
-                target_region = parse_selection(selection)
-                if target_region is not None:
-                    target_crop = crop_target_region(audit_image, target_region)
-                    st.image(target_crop.data, caption="Selected target product", use_container_width=True)
-                else:
-                    st.info("Drag across the subject, or choose Use full image, to continue.")
-            except Exception as exc:
-                target_region = None
-                target_crop = None
-                st.warning(f"The selected target could not be prepared: {exc}")
-            _sync_target(st.session_state, target_region)
+        st.markdown("### Select the area you want to audit.")
+        selection = select_target(
+            audit_image, key=_expanded_canvas_key(st.session_state, image_id)
+        )
+        try:
+            target_region = parse_selection(selection)
+            if target_region is not None:
+                target_crop = crop_target_region(audit_image, target_region)
+                st.image(target_crop.data, caption="Selected audit area", use_container_width=True)
+            else:
+                st.info("Select the area you want to audit.")
+        except Exception as exc:
+            target_region = None
+            target_crop = None
+            st.warning(f"The selected target could not be prepared: {exc}")
+        _sync_target(st.session_state, target_region)
 
         # -----------------------------------------------------
         # Analyze
         # -----------------------------------------------------
 
-        expanded_target_ready = (
-            audit_mode is AuditMode.EXPANDED
-            and target_region is not None
-            and target_crop is not None
-        )
-
-        analyze_disabled = (
-            audit_mode is AuditMode.EXPANDED
-            and not expanded_target_ready
-        )
+        target_ready = target_region is not None and target_crop is not None
 
         analyze = st.button(
             "Analyze Shelf",
             key="shelf_audit_analyze",
             type="primary",
             use_container_width=True,
-            disabled=analyze_disabled,
+            disabled=not target_ready,
         )
 
 
-        if analyze:
+        if analyze and target_ready:
 
             _clear_completed_audit(st.session_state)
 
@@ -467,10 +373,6 @@ def render():
                 st.markdown(f"**Recommendation:** {opportunity.recommendation}")
                 st.write("")
         st.divider()
-        st.caption(
-            f"{get_mode_config(result.mode).label} · "
-            f"{get_depth_config(result.depth).label}"
-        )
         render_report_section(
             result, audit_photo=st.session_state.get("shelf_audit_completed_photo")
         )

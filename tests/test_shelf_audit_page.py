@@ -60,7 +60,7 @@ class ExpandedPageTests(unittest.TestCase):
         self.enterContext(patch("shelf_audit.page.st.file_uploader", return_value=self.uploaded))
         self.audit = self.enterContext(patch(
             "shelf_audit.page.run_audit",
-            return_value=AuditResult([], AuditMode.EXPANDED, AuditDepth.QUICK, 0),
+            return_value=AuditResult([], AuditMode.EXPANDED, AuditDepth.DEEP, 0),
         ))
         self.enterContext(patch("shelf_audit.page.OpenAIAuditProvider"))
         self.report = self.enterContext(patch("shelf_audit.page.render_report_section"))
@@ -68,7 +68,6 @@ class ExpandedPageTests(unittest.TestCase):
         self.image = self.enterContext(patch("shelf_audit.page.st.image", wraps=st.image))
         self.app = AppTest.from_string("from shelf_audit.page import render\nrender()")
         self.app.run()
-        self.app.radio(key="shelf_audit_mode").set_value("Expanded").run()
         self.assert_ok()
 
     def assert_ok(self):
@@ -101,7 +100,6 @@ class ExpandedPageTests(unittest.TestCase):
         self.assertEqual(self.image.call_count, 0)  # No old crop preview.
         for key in ("shelf_audit_completed_result", "shelf_audit_completed_photo", "shelf_audit_report_document"):
             self.assertNotIn(key, self.app.session_state)
-        self.assertEqual(self.app.session_state["shelf_audit_depth"], "Quick Audit")
         self.assertIs(self.app.session_state["shelf_audit_cache"], cache)
         self.assertEqual(self.audit.call_count, 1)
         # Returning to the original image cannot resurrect its old drawing.
@@ -119,45 +117,35 @@ class ExpandedPageTests(unittest.TestCase):
         self.assertEqual(self.canvas.call_args.kwargs["key"], key)
         self.assertFalse(self.app.button(key="shelf_audit_analyze").disabled)
         self.assertIn("shelf_audit_completed_result", self.app.session_state)
-        self.assertEqual(self.image.call_args.kwargs["caption"], "Selected target product")
+        self.assertEqual(self.image.call_args.kwargs["caption"], "Selected audit area")
         self.assertTrue(self.image.call_args.kwargs["use_container_width"])
         self.assertEqual(self.audit.call_count, 1)
         request = self.audit.call_args.kwargs
         self.assertEqual(request["mode"], AuditMode.EXPANDED)
+        self.assertEqual(request["depth"], AuditDepth.DEEP)
         self.assertEqual(request["target_region"].x, 0.1)
         self.assertIsNotNone(request["target_crop"])
         self.assertNotEqual(request["image"].data, request["target_crop"].data)
 
-    def test_mode_switch_clears_result_and_product_has_no_target(self):
+    def test_mode_and_depth_controls_and_labels_are_absent(self):
+        self.assertEqual([r.key for r in self.app.radio], ["shelf_audit_image_source"])
         self.complete()
-        old_key = self.canvas.call_args.kwargs["key"]
-        self.app.radio(key="shelf_audit_mode").set_value("Product").run()
-        self.assert_ok()
-        self.assertNotIn("shelf_audit_target_canvas_key", self.app.session_state)
-        self.assertNotIn("shelf_audit_completed_result", self.app.session_state)
-        self.assertNotIn("shelf_audit_completed_photo", self.app.session_state)
-        self.assertFalse(self.app.button(key="shelf_audit_analyze").disabled)
-        self.app.button(key="shelf_audit_analyze").click().run()
-        self.assert_ok()
-        request = self.audit.call_args.kwargs
-        self.assertEqual(request["mode"], AuditMode.PRODUCT)
-        self.assertIsNone(request["target_region"])
-        self.assertIsNone(request["target_crop"])
-        self.app.radio(key="shelf_audit_mode").set_value("Expanded").run()
-        self.assertNotEqual(self.canvas.call_args.kwargs["key"], old_key)
-        self.assertNotIn("shelf_audit_completed_result", self.app.session_state)
-        self.assertTrue(self.app.button(key="shelf_audit_analyze").disabled)
+        visible = " ".join(e.value for collection in (self.app.caption, self.app.subheader, self.app.markdown) for e in collection)
+        for label in ("Expanded", "Deep", "Product", "Quick", "Audit mode", "Audit depth"):
+            self.assertNotIn(label, visible)
 
-    def test_different_image_while_product_then_expanded_starts_clean(self):
-        self.draw()
-        old_key = self.canvas.call_args.kwargs["key"]
-        self.app.radio(key="shelf_audit_mode").set_value("Product").run()
-        self.uploaded.getvalue.return_value = photo("blue")
-        self.app.run()
-        self.app.radio(key="shelf_audit_mode").set_value("Expanded").run()
-        self.assert_ok()
-        self.assertNotEqual(self.canvas.call_args.kwargs["key"], old_key)
+    def test_missing_target_blocks_analyze_and_never_defaults_to_full_frame(self):
         self.assertTrue(self.app.button(key="shelf_audit_analyze").disabled)
+        self.assertTrue(any(e.value == "Select the area you want to audit." for e in self.app.info))
+        self.audit.assert_not_called()
+        self.assertNotIn("shelf_audit_completed_result", self.app.session_state)
+
+    def test_legacy_widget_state_cannot_override_fixed_routing(self):
+        self.app.session_state["shelf_audit_mode"] = "Product"
+        self.app.session_state["shelf_audit_depth"] = "Quick Audit"
+        self.complete()
+        self.assertEqual(self.audit.call_args.kwargs["mode"], AuditMode.EXPANDED)
+        self.assertEqual(self.audit.call_args.kwargs["depth"], AuditDepth.DEEP)
 
     def test_clear_target_keeps_image_and_mode_and_allows_redraw(self):
         self.complete()
@@ -169,7 +157,6 @@ class ExpandedPageTests(unittest.TestCase):
         self.assert_ok()
         self.assertEqual(self.canvas.call_args.kwargs["key"], old_key)
         self.assertEqual(self.app.session_state["shelf_audit_active_context"], context)
-        self.assertEqual(self.app.session_state["shelf_audit_mode"], "Expanded")
         self.assertEqual(self.uploaded.getvalue(), self.original)
         self.assertTrue(self.app.button(key="shelf_audit_analyze").disabled)
         self.assertEqual(self.image.call_count, 0)
@@ -198,13 +185,44 @@ class ExpandedPageTests(unittest.TestCase):
         self.assertFalse(self.app.button(key="shelf_audit_analyze").disabled)
 
     def test_full_frame_and_deep_preserved(self):
-        self.app.radio(key="shelf_audit_depth").set_value("Deep Audit").run()
         self.draw(dict(x=0,y=0,width=1,height=1))
         self.app.button(key="shelf_audit_analyze").click().run()
         request = self.audit.call_args.kwargs
         self.assertEqual(request["depth"], AuditDepth.DEEP)
-        self.assertEqual(request["target_region"].width, 1)
+        self.assertEqual(request["mode"], AuditMode.EXPANDED)
+        self.assertEqual(vars(request["target_region"]), dict(x=0,y=0,width=1,height=1))
         self.assertIsNotNone(request["target_crop"])
+
+    def test_real_orchestration_cache_target_identity_telemetry_and_provider_payload(self):
+        from shelf_audit.audit import run_audit
+        from shelf_audit.providers.base import ProviderAnalysisResult, ProviderUsage
+        from shelf_audit.providers.openai import OpenAIAuditProvider, OpenAIProviderConfig
+        provider = Mock(name="audit_provider")
+        provider.name, provider.model_name, provider.config_version = "mock", "test-model", "3"
+        provider.analyze.return_value = ProviderAnalysisResult([], ProviderUsage())
+        self.audit.side_effect = run_audit
+        with patch("shelf_audit.page.OpenAIAuditProvider", return_value=provider):
+            self.complete()
+            self.app.button(key="shelf_audit_analyze").click().run()
+            self.assert_ok()
+            self.assertEqual(provider.analyze.call_count, 1)
+            records = self.app.session_state["shelf_audit_usage_tracker"].all()
+            self.assertEqual([(r.mode,r.depth,r.cache_hit) for r in records],
+                             [("expanded","deep",False),("expanded","deep",True)])
+            limiter = self.app.session_state["shelf_audit_rate_limiter"]
+            self.assertEqual(limiter.remaining("shelf_audit"), 4)
+            request = provider.analyze.call_args.args[0]
+            adapter = OpenAIAuditProvider(config=OpenAIProviderConfig(model_name="test-model"))
+            images = adapter._build_image_inputs(request)
+            self.assertEqual([i["role"] for i in images], ["full_scene","target_crop"])
+            self.assertEqual(vars(request.target_region), rectangle())
+            self.app.run()  # Report rerun must not execute the audit again.
+            self.assertEqual(provider.analyze.call_count, 1)
+            self.draw(rectangle(x=.2))
+            self.app.button(key="shelf_audit_analyze").click().run()
+            self.assert_ok()
+            self.assertEqual(provider.analyze.call_count, 2)
+            self.assertEqual(limiter.remaining("shelf_audit"), 3)
 
     def test_upload_source_uses_same_image_identity(self):
         self.draw()
