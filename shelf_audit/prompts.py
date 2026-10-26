@@ -13,7 +13,7 @@ from .audit_modes import get_mode_config, get_depth_config
 from .models import AuditMode, AuditDepth, TargetRegion
 
 
-PROMPT_VERSION = "v14"
+PROMPT_VERSION = "v15"
 
 
 def _compact_criteria(
@@ -120,6 +120,23 @@ The selected target remains the subject of every finding.
 
 Surrounding products, displays, graphics, and open space are CONTEXT, not
 additional audit targets.
+
+When the selected region covers the full image, the whole image is the audit
+subject. Reason directly from that subject; do not force an outside comparison.
+
+Use surrounding products, fixtures, shelves, displays, pricing, or merchandising
+only when they provide relevant evidence supporting a recommendation for the
+selected target. Never independently audit the surroundings or recommend changes
+to an unrelated display outside the selected region.
+
+For example, nearby tuna in a tray may support containment for selected tuna;
+a nearby holder or rack may demonstrate a plausible footprint or containment
+approach for selected notebooks. Adjacent branding or price/signage may explain
+a target visibility or navigation gap when the comparison is visibly relevant.
+
+Context is optional, not mandatory. Do not invent a comparison merely because
+another product is visible. If the target itself provides sufficient evidence,
+reason directly from the target without referencing the environment.
 
 A recommendation is valid only when it improves the selected target or uses
 the surrounding scene to explain an opportunity for that target.
@@ -272,6 +289,47 @@ An opportunity may come from:
 Use the supplied criteria library as a toolbox of known opportunities.
 
 Do not force criteria onto the image.
+
+VISUAL EVIDENCE AND IMAGE QUALITY:
+
+Do NOT treat photographic artifacts as physical merchandising conditions.
+Blur, motion blur, compression, low resolution, glare, reflection, camera focus,
+distance from the shelf, photographic shadows, perspective distortion, and text
+unreadable due only to image quality must not, by themselves, create a recommendation.
+
+Image-quality limitations should reduce confidence, limit text-reading claims,
+or cause unsupported observations to be omitted. Do not infer that package labels
+are hard to read in-store because their text is blurry in the photo.
+
+If package text is not reliably readable in this photo, do not judge physical
+label legibility from it. Recommend clearer messaging or navigation only when
+the physical display visibly lacks differentiation or guidance independently
+of camera quality.
+
+PHYSICAL OPPORTUNITY BEFORE GENERIC GRAPHICS:
+
+Before returning a graphics or navigation recommendation, internally:
+1. Identify the underlying visible merchandising problem.
+2. Consider whether a physical or structural solution better addresses that problem.
+3. Consider communication or graphics solutions for the supported need.
+4. Choose the smallest meaningful KKG-produced solution supported by evidence.
+5. Preserve a graphics solution separately only when it addresses a materially
+   different need.
+
+Where physically supported, consider trays, PDQs, risers, dividers, shelf channels,
+stackers, compact racks, sidekicks, dedicated fixtures, branded fixture enhancements,
+purpose-built replacement fixtures, shelf reconfiguration, stackability, vertical
+and horizontal space utilization, and display capacity. These are possibilities,
+not required findings; do not force a physical solution when none is justified.
+Preserve the existing guidance for distinct fixture enhancement and replacement
+scopes below.
+
+Shelf strips, shelf talkers, navigation graphics, variant callouts, and messaging
+panels remain allowed when materially justified by visible evidence. They must
+not become a default fallback or fill an unused finding slot.
+A divided tray for containment and variant callouts for assortment navigation
+can address distinct needs. A shelf strip and shelf talker for the same navigation
+problem are alternatives within one recommendation, not separate findings.
 
 KKG RECOMMENDATION CONTRACT:
 
