@@ -13,7 +13,7 @@ from .audit_modes import get_mode_config, get_depth_config
 from .models import AuditMode, AuditDepth, TargetRegion
 
 
-PROMPT_VERSION = "v15"
+PROMPT_VERSION = "v16"
 
 
 def _compact_criteria(
@@ -892,6 +892,53 @@ suppress a physically supported KKG fixture or display opportunity simply
 because store staff could also regroup or face the products.
 
 Do not invent SKU relationships that cannot be established from the image.
+STANDARD SHELF PHYSICAL SCAN:
+
+When the selected target is merchandised on an ordinary retail shelf, perform a
+deliberate physical-use scan before settling on graphics, navigation, or
+communication opportunities.
+
+Inspect only what is visibly supported:
+
+1. How the product uses the available shelf height.
+2. Whether the visible package shape, stability, and clearance support stacking,
+   tiering, or physical elevation.
+3. How the product uses the visible shelf width and footprint.
+4. Whether visible front-to-back shelf space suggests useful depth, containment,
+   or a better presentation method.
+5. Whether loose product, open gaps, mixed product heights, unstable presentation,
+   or underused shelf space support a tray, compact PDQ, product riser, divider,
+   shelf channel, stacker, or compact rack.
+6. Whether the current shelf setup limits useful capacity, product visibility,
+   shopper access, organization, or brand presence.
+7. Whether nearby merchandising provides a relevant physical reference that helps
+   explain an opportunity for the selected target.
+
+Use this scan to identify unrealized physical merchandising opportunities, not
+ordinary store-maintenance actions.
+
+Do not assume unseen shelf depth, exact dimensions, future inventory, retailer
+authorization, or ownership of nearby open space.
+
+Do not recommend stacking merely because products could theoretically be stacked.
+
+Stacking, tiering, or elevation must be visibly supported by:
+- package form
+- stability
+- vertical clearance
+- shopper access
+- product visibility
+
+Do not force a shelf-utilization finding when the current shelf use is already
+reasonable.
+
+Do not recommend a tray, PDQ, riser, divider, channel, stacker, or rack merely
+because the format is available in the KKG toolkit.
+
+The physical condition must visibly support the solution.
+
+After completing this physical scan, consider graphics, navigation, messaging,
+and branding when they address a separate visible need.
 
 PHYSICAL MERCHANDISING UPGRADE:
 
@@ -1020,23 +1067,35 @@ OPPORTUNITY SELECTION LADDER:
 Before writing findings, internally follow this order:
 
 1. Recognize the selected product or product area and the visible condition.
+
 2. Read the surrounding retail context and identify the visible placement type.
-3. Decide whether the condition is only store maintenance or reveals a real
+
+3. If the selected target is on an ordinary retail shelf, deliberately inspect
+   how the product uses the visible shelf before choosing a solution. Consider
+   shelf height, package form, stackability, visible width and depth, containment,
+   capacity, access, and physically supported tray, PDQ, riser, divider, channel,
+   stacker, or compact-rack opportunities.
+
+4. Decide whether the condition is only store maintenance or reveals a real
    merchandising, branding, signage, fixture, display, or shopper need.
-4. Exclude maintenance-only actions from the candidate findings.
-5. Ask what KKG could design, print, fabricate, kit, assemble, install, brand,
+
+5. Exclude maintenance-only actions from the candidate findings.
+
+6. Ask what KKG could design, print, fabricate, kit, assemble, install, brand,
    modify, upgrade, or replace to address the need.
-6. For an existing fixture, consider improving it, structurally modifying it,
+
+7. For an existing fixture, consider improving it, structurally modifying it,
    and replacing it with a better branded fixture when the scene supports those
    options.
-7. When enhancement and replacement are both strongly supported and represent
+
+8. When enhancement and replacement are both strongly supported and represent
    materially different KKG scopes, preserve both as separate candidates before
    ranking rather than collapsing them into one idea.
-8. Use the visible placement to determine the largest and smallest formats that
-   are genuinely plausible.
-9. Choose the strongest grounded KKG opportunities, then say them simply.
 
-Do not output this reasoning process.
+9. Use the visible placement to determine the largest and smallest formats that
+   are genuinely plausible.
+
+10. Choose the strongest grounded KKG opportunities, then say them simply.
 
 VOICE AND PERSPECTIVE:
 
@@ -1254,9 +1313,8 @@ After identifying the most obvious issue, continue looking for other distinct
 ways KKG could improve the selected product area.
 
 Include a deliberate scan for opportunities enabled by the visible placement
-itself, including a supported rack, endcap, side placement, floor placement,
-or pallet-scale execution.
-
+itself, including standard-shelf utilization, stacking or tiering, supported
+racks, endcaps, side placement, floor placement, or pallet-scale execution.
 Do not count ordinary store maintenance as opportunity coverage.
 
 A single image may support several different opportunities, such as:
