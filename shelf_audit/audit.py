@@ -18,6 +18,7 @@ It does not import Streamlit or any specific AI SDK.
 
 from __future__ import annotations
 
+import os
 from time import perf_counter
 
 from .audit_modes import get_mode_config, get_depth_config
@@ -37,8 +38,12 @@ from .models import (
     AuditResult,
 )
 from .providers.base import ProviderAnalysisResult, ProviderConfigurationError
-from .prioritization import prioritize_opportunities
+from .prioritization import prioritize_opportunities, snapshot_candidates
 from .criteria import validate_criteria
+
+
+def debug_trace_enabled() -> bool:
+    return os.environ.get("SHELF_AUDIT_DEBUG_TRACE") == "1"
 
 
 def _record_usage_safely(
@@ -73,6 +78,7 @@ def run_audit(
     rate_limit_key: str | None = None,
     usage_tracker=None,
     ai_enabled: bool = True,
+    debug_trace: dict | None = None,
 ) -> AuditResult:
     """
     Run one audit through the provider-neutral pipeline.
@@ -83,6 +89,9 @@ def run_audit(
     - usage_tracker
     """
 
+    if debug_trace is not None:
+        debug_trace.clear()
+    trace = debug_trace if debug_trace_enabled() else None
     start_time = perf_counter()
 
     provider_name = getattr(
@@ -211,6 +220,9 @@ def run_audit(
                 cached_result = None
 
         if cached_result is not None:
+            if trace is not None:
+                trace["note"] = "Cache hit: earlier candidate stages are unavailable; provider was not called."
+                snapshot_candidates(trace, "FINAL_SELECTED", cached_result.opportunities, scored=True)
             duration = perf_counter() - start_time
 
             _record_usage_safely(
@@ -276,6 +288,7 @@ def run_audit(
             raise TypeError("Provider returned an invalid result.")
 
         opportunities = provider_result.opportunities
+        snapshot_candidates(trace, "RAW_PROVIDER_CANDIDATES", opportunities)
 
         provider_called = (
             provider_result.usage.provider_called
@@ -331,7 +344,10 @@ def run_audit(
             criteria=criteria,
             max_results=depth_config.max_opportunities,
             min_confidence=depth_config.min_confidence,
+            debug_trace=trace,
         )
+
+        snapshot_candidates(trace, "FINAL_SELECTED", prioritized, scored=True)
 
         result = AuditResult(
             opportunities=prioritized,

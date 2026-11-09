@@ -22,6 +22,27 @@ DEFAULT_MIN_CONFIDENCE = 0.55
 DEFAULT_SIMILARITY_THRESHOLD = 0.78
 
 
+def snapshot_candidates(trace, stage, opportunities, *, scored=False):
+    """Detach diagnostic scalar values without replacing pipeline objects."""
+    if trace is None:
+        return
+    trace.setdefault("stages", {})[stage] = [
+        {**{name: getattr(candidate, name, None) for name in (
+            "criterion_id", "title", "relevance", "confidence", "impact", "actionability"
+        )}, "priority_score": getattr(candidate, "priority_score", None) if scored else None,
+         "status": "kept"}
+        for candidate in opportunities
+    ]
+
+
+def _mark_removed(trace, stage, survivors, reason):
+    if trace is not None:
+        kept_ids = {candidate.criterion_id for candidate in survivors}
+        for row in trace["stages"][stage]:
+            if row["criterion_id"] not in kept_ids:
+                row["status"] = reason
+
+
 def _normalize_text(value: str) -> str:
     """
     Normalize text for lightweight similarity comparison.
@@ -301,6 +322,7 @@ def prioritize_opportunities(
     max_results: int,
     min_confidence: float = DEFAULT_MIN_CONFIDENCE,
     similarity_threshold: float = DEFAULT_SIMILARITY_THRESHOLD,
+    debug_trace: dict | None = None,
 ) -> list[Opportunity]:
     """
     Apply the complete deterministic prioritization pipeline.
@@ -323,17 +345,28 @@ def prioritize_opportunities(
         min_confidence=min_confidence,
     )
 
+    snapshot_candidates(debug_trace, "AFTER_CONFIDENCE_FILTER", confident)
+    if debug_trace is not None and "RAW_PROVIDER_CANDIDATES" in debug_trace.get("stages", {}):
+        _mark_removed(debug_trace, "RAW_PROVIDER_CANDIDATES", confident, "removed_low_confidence")
+
     deduplicated = deduplicate_opportunities(
         confident,
         similarity_threshold=similarity_threshold,
     )
 
+    snapshot_candidates(debug_trace, "AFTER_DUPLICATE_REDUCTION", deduplicated, scored=True)
+    _mark_removed(debug_trace, "AFTER_CONFIDENCE_FILTER", deduplicated, "removed_duplicate")
+
     ranked = rank_opportunities(
         deduplicated
     )
 
-    return diversify_opportunities(
+    selected = diversify_opportunities(
         ranked,
         criteria=criteria,
         max_results=max_results,
     )
+    snapshot_candidates(debug_trace, "AFTER_DIVERSITY_OR_SELECTION", selected, scored=True)
+    # The combined selector does not expose a unique diversity vs priority cause.
+    _mark_removed(debug_trace, "AFTER_DUPLICATE_REDUCTION", selected, None)
+    return selected

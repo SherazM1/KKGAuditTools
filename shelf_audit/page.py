@@ -13,7 +13,7 @@ Current foundation:
 
 import streamlit as st
 
-from .audit import run_audit
+from .audit import run_audit, debug_trace_enabled
 from .criteria import load_criteria
 from .guardrails import GuardrailError
 from .image_utils import (
@@ -36,11 +36,35 @@ from .reporting.ui import render_report_section
 # Canvas helpers
 # ---------------------------------------------------------
 
+def _render_debug_trace(trace):
+    if not debug_trace_enabled():
+        return
+    with st.expander("Audit Debug Trace"):
+        if not trace:
+            st.caption("No trace collected for this run. Run a new audit with tracing enabled.")
+            return
+        if trace.get("note"):
+            st.caption(trace["note"])
+        stages = trace.get("stages", {})
+        labels = ("Raw candidates", "After confidence", "After dedupe", "After selection", "Final")
+        names = ("RAW_PROVIDER_CANDIDATES", "AFTER_CONFIDENCE_FILTER",
+                 "AFTER_DUPLICATE_REDUCTION", "AFTER_DIVERSITY_OR_SELECTION", "FINAL_SELECTED")
+        st.write(" | ".join(f"{label}: {len(stages[name]) if name in stages else 'unavailable'}"
+                            for label, name in zip(labels, names)))
+        st.caption("Status describes the next transition. Blank means the exact selection cause is unavailable. "
+                   "Raw means provider-returned opportunities, not the model's unparsed response.")
+        for name in names:
+            if name in stages:
+                st.caption(name)
+                st.dataframe(stages[name], hide_index=True, use_container_width=True)
+
+
 def _clear_completed_audit(state) -> None:
     for key in (
         "shelf_audit_completed_result",
         "shelf_audit_report_document",
         "shelf_audit_completed_photo",
+        "shelf_audit_debug_trace",
     ):
         state.pop(key, None)
 
@@ -302,6 +326,7 @@ def render():
                     "Analyzing shelf opportunities..."
                 ):
 
+                    debug_trace = {} if debug_trace_enabled() else None
                     result = run_audit(
                         image=audit_image,
                         criteria=criteria,
@@ -315,6 +340,7 @@ def render():
                         rate_limit_key="shelf_audit",
                         usage_tracker=st.session_state["shelf_audit_usage_tracker"],
                         ai_enabled=ai_enabled,
+                        debug_trace=debug_trace,
                     )
 
             except GuardrailError as exc:
@@ -342,7 +368,11 @@ def render():
 
                 st.stop()
 
-            except Exception:
+            except Exception as exc: 
+
+                print(
+                    f"Shelf Audit failed: {type(exc).__name__}: {exc}"
+                )
 
                 st.error(
                     f"The audit could not be completed. Please try again later or contact the app owner."
@@ -351,6 +381,7 @@ def render():
                 st.stop()
 
 
+            st.session_state["shelf_audit_debug_trace"] = debug_trace
             st.session_state["shelf_audit_completed_result"] = result
             # Retain the exact upload/camera bytes, not the processed audit image
             # or Expanded-mode crop. Associate them only with this successful run.
@@ -373,6 +404,7 @@ def render():
                 st.markdown(f"**Recommendation:** {opportunity.recommendation}")
                 st.write("")
         st.divider()
+        _render_debug_trace(st.session_state.get("shelf_audit_debug_trace"))
         render_report_section(
             result, audit_photo=st.session_state.get("shelf_audit_completed_photo")
         )
