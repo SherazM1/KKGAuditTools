@@ -52,19 +52,117 @@ class ShelfAuditPromptTests(unittest.TestCase):
             with self.subTest(instruction=instruction):
                 self.assertIn(instruction, prompt)
 
-    def test_v17_physical_trigger_and_environment_reference_are_present(self):
-        self.assertEqual(PROMPT_VERSION, "v17")
+    def section(self, start, end):
+        return self.prompt().split(start, 1)[1].split(end, 1)[0]
+
+    def test_v18_three_part_gate_preserves_candidate_before_communication(self):
+        self.assertEqual(PROMPT_VERSION, "v18")
         prompt = self.prompt()
+        self.assertLess(prompt.index("STANDARD SHELF PHYSICAL SCAN:"),
+                        prompt.index("ASSORTMENT AND SHOPPER NAVIGATION:"))
+        scan = self.section("STANDARD SHELF PHYSICAL SCAN:",
+                            "ENVIRONMENT-BASED REFERENCE LANGUAGE:")
+        self.assertLess(scan.index("Inspect only what is visibly supported"),
+                        scan.index("PHYSICAL CANDIDATE DECISION:"))
         for instruction in (
-            "When this scan identifies a strong, visibly supported physical merchandising",
-            "generate that opportunity as a candidate before moving on to graphics, navigation, or education opportunities",
-            "Do not generate a physical candidate when:",
-            "VERTICAL SPACE",
-            "ENVIRONMENT-BASED REFERENCE LANGUAGE:",
-            "The environment is supporting evidence, not a second audit target.",
-            "Do NOT make environment language mandatory.",
+            "a physical candidate exists only when all three are true",
+            "VISIBLE CONDITION: A specific physical condition is visibly supported",
+            "PLAUSIBLE KKG RESPONSE: At least one KKG-produced physical solution fits that specific condition and the visible placement",
+            "MEANINGFUL BENEFIT: The solution would materially improve presentation, visibility, containment, capacity, shopper access, organization, or brand presence",
+            "When all three are true, generate and preserve the physical opportunity as a candidate before evaluating graphics, navigation, or education",
+            "Do not recognize it internally and then omit it because a simpler communication idea is also valid",
+            "may both be returned when they solve meaningfully different visible needs",
+            "If any of the three conditions are not sufficiently supported, do not force a physical candidate",
         ):
             with self.subTest(instruction=instruction):
+                self.assertIn(instruction, scan)
+        self.assertLess(scan.index("1. VISIBLE CONDITION"), scan.index("2. PLAUSIBLE KKG RESPONSE"))
+        self.assertLess(scan.index("2. PLAUSIBLE KKG RESPONSE"), scan.index("3. MEANINGFUL BENEFIT"))
+
+    def test_selection_ladder_preserves_passed_physical_candidate(self):
+        ladder = self.section("OPPORTUNITY SELECTION LADDER:", "VOICE AND PERSPECTIVE:")
+        for instruction in (
+            "If the physical candidate decision passes, preserve that physical candidate before evaluating graphics, navigation, or education opportunities",
+            "Do not drop a supported physical candidate merely because another opportunity is easier to explain",
+            "Do not require a physical candidate when the decision gate does not pass",
+            "shelf height, package form, stackability, visible width and depth, containment, capacity, access",
+            "tray, PDQ, riser, divider, channel, stacker, or compact-rack opportunities",
+        ):
+            with self.subTest(instruction=instruction):
+                self.assertIn(instruction, ladder)
+
+    def test_coverage_does_not_silently_replace_physical_candidate(self):
+        coverage = self.section("OPPORTUNITY COVERAGE:", "RECOMMENDATION VARIETY:")
+        for instruction in (
+            "A strong, distinct physical shelf opportunity should not be omitted merely because a simpler graphics, navigation, or education opportunity is also valid",
+            "Physical and communication findings may coexist when they solve different visible needs",
+            "Do not force a physical finding when the physical decision gate does not pass",
+            "Do not create extra findings merely to increase the count",
+        ):
+            with self.subTest(instruction=instruction):
+                self.assertIn(instruction, coverage)
+
+    def test_final_check_verifies_preservation_and_context(self):
+        final = self.section("FINAL LANGUAGE CHECK:", "Do not output this internal check.")
+        self.assertIn("If the standard-shelf physical candidate decision passed, did I preserve that physical opportunity as a candidate rather than silently replacing it with a graphics, navigation, or education idea?", final)
+        self.assertIn("If surrounding merchandising materially supported the recommendation, did I briefly reference that visible context without turning the surroundings into a separate audit target?", final)
+
+    def test_physical_requirements_are_specific_to_each_solution(self):
+        scan = self.section("STANDARD SHELF PHYSICAL SCAN:", "ENVIRONMENT-BASED REFERENCE LANGUAGE:")
+        for instruction in (
+            "Apply physical requirements only to the formats that actually depend on them",
+            "Stacking / tiering: require visible package stability, usable vertical clearance, reasonable shopper access, and product visibility",
+            "Tray / divider / channel: require a compatible shelf footprint, product form, and a visible containment or organization need",
+            "Product riser: require a visible reason elevation or tiering would improve visibility or presentation, plus appropriate clearance",
+            "Compact rack: require visible footprint/support, product compatibility, and shopper access",
+            "Do NOT require proof of unused vertical clearance for every physical format",
+            "Do NOT allow one unsupported physical format to invalidate a different supported physical format",
+            "Do not recommend stacking merely because products could theoretically be stacked",
+            "Do not assume unseen shelf depth, exact dimensions, future inventory, retailer authorization, or ownership of nearby open space",
+        ):
+            with self.subTest(instruction=instruction):
+                self.assertIn(instruction, scan)
+        tray_rule = scan.split("- Tray / divider / channel:", 1)[1].split("- Product riser:", 1)[0]
+        self.assertNotIn("clearance", tray_rule)
+        self.assertNotIn("clearance or shopper access is not visibly supported", scan)
+        self.assertNotIn("Do not generate a physical candidate when:", scan)
+
+    def test_environment_reference_is_material_optional_and_target_bound(self):
+        environment = self.section("ENVIRONMENT-BASED REFERENCE LANGUAGE:", "PHYSICAL MERCHANDISING UPGRADE:")
+        for instruction in (
+            "When nearby merchandising materially helped establish the opportunity, preserve that reference in the Why field",
+            "so the client can understand what visible environmental evidence helped drive the recommendation",
+            "Do NOT make environment language mandatory",
+            "Do NOT mention surroundings when: - the target itself provides enough evidence - no useful comparison exists - nearby merchandising is unrelated",
+            "the environment did not materially influence the recommendation",
+            "The environment is supporting evidence, not a second audit target",
+        ):
+            with self.subTest(instruction=instruction):
+                self.assertIn(instruction, environment)
+
+    def test_existing_physical_scan_and_large_format_scopes_remain(self):
+        prompt = self.prompt()
+        scan = self.section("STANDARD SHELF PHYSICAL SCAN:", "ENVIRONMENT-BASED REFERENCE LANGUAGE:")
+        for instruction in (
+            "available shelf height", "visible package shape, stability, and clearance",
+            "visible shelf width and footprint", "front-to-back shelf space",
+            "containment", "rear product is obscured", "mixed product heights",
+            "underused shelf space", "capacity, product visibility, shopper access, organization, or brand presence",
+            "nearby merchandising provides a relevant physical reference",
+        ):
+            with self.subTest(scan_instruction=instruction):
+                self.assertIn(instruction, scan)
+        for instruction in (
+            "pegboard or hanging-fixture context may support navigation graphics, headers, branded hanging systems, racks, or fixture graphics",
+            "Recommend a sidekick or other side-oriented secondary display only when side-of-fixture placement is visibly established or strongly supported",
+            "Recommend an endcap only when aisle-end or end-of-run context is visible",
+            "Never infer an endcap location from an ordinary inline shelf",
+            "Recommend a floorstand only when usable floor-placement context is visible",
+            "Recommend quarter-pallet, half-pallet, full-pallet, or similar large floor-based formats only when the scene supports substantial visible product volume and an appropriate floor or pallet-scale placement",
+            "When enhancement and replacement are both strongly supported and represent materially different KKG scopes, preserve both as separate candidates before ranking",
+            "Do NOT automatically combine fixture enhancement and fixture replacement",
+        ):
+            with self.subTest(format_instruction=instruction):
                 self.assertIn(instruction, prompt)
 
     def test_physical_reasoning_precedes_graphics_without_banning_graphics(self):

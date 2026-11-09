@@ -13,7 +13,7 @@ from .audit_modes import get_mode_config, get_depth_config
 from .models import AuditMode, AuditDepth, TargetRegion
 
 
-PROMPT_VERSION = "v17"
+PROMPT_VERSION = "v18"
 
 
 def _compact_criteria(
@@ -862,24 +862,6 @@ the visible scene supports that relationship.
 
 STANDARD SHELF PHYSICAL SCAN:
 
-When this scan identifies a strong, visibly supported physical merchandising
-opportunity, generate that opportunity as a candidate before moving on to
-graphics, navigation, or education opportunities.
-
-Do not merely recognize a valid physical shelf opportunity internally and then
-replace it with an easier communication recommendation.
-
-A physical candidate and a graphics, navigation, or education candidate may
-both be returned when they address meaningfully different visible needs.
-
-Do not generate a physical candidate when:
-- the current shelf use is already reasonable
-- the physical improvement is speculative
-- package form or stability does not support it
-- clearance or shopper access is not visibly supported
-- the solution depends on unseen space or assumed inventory
-- the only issue is ordinary maintenance
-
 When the selected target is merchandised on an ordinary retail shelf, perform a
 deliberate physical-use scan before settling on graphics, navigation, or
 communication opportunities.
@@ -899,6 +881,28 @@ Inspect only what is visibly supported:
    shopper access, organization, or brand presence.
 7. Whether nearby merchandising provides a relevant physical reference that helps
    explain an opportunity for the selected target.
+
+PHYSICAL CANDIDATE DECISION:
+
+After the scan, a physical candidate exists only when all three are true:
+1. VISIBLE CONDITION: A specific physical condition is visibly supported, such
+   as underused height, poor containment, hidden rear product, weak use of the
+   visible shelf footprint, unstable presentation, mixed package forms that
+   create a physical merchandising need, or another clearly supported shelf-use issue.
+2. PLAUSIBLE KKG RESPONSE: At least one KKG-produced physical solution fits that
+   specific condition and the visible placement.
+3. MEANINGFUL BENEFIT: The solution would materially improve presentation,
+   visibility, containment, capacity, shopper access, organization, or brand presence.
+
+The scan decides whether a physical candidate should exist, not just whether
+physical ideas are possible. When all three are true, generate and preserve the
+physical opportunity as a candidate before evaluating graphics, navigation, or
+education. Do not recognize it internally and then omit it because a simpler
+communication idea is also valid.
+
+A physical candidate and a communication candidate may both be returned when
+they solve meaningfully different visible needs. If any of the three conditions
+are not sufficiently supported, do not force a physical candidate.
 
 Visible physical triggers that can support a physical candidate include:
 
@@ -944,12 +948,19 @@ authorization, or ownership of nearby open space.
 
 Do not recommend stacking merely because products could theoretically be stacked.
 
-Stacking, tiering, or elevation must be visibly supported by:
-- package form
-- stability
-- vertical clearance
-- shopper access
-- product visibility
+Apply physical requirements only to the formats that actually depend on them:
+- Stacking / tiering: require visible package stability, usable vertical
+  clearance, reasonable shopper access, and product visibility.
+- Tray / divider / channel: require a compatible shelf footprint, product form,
+  and a visible containment or organization need.
+- Product riser: require a visible reason elevation or tiering would improve
+  visibility or presentation, plus appropriate clearance.
+- Compact rack: require visible footprint/support, product compatibility,
+  and shopper access.
+
+Do NOT require proof of unused vertical clearance for every physical format.
+Do NOT allow one unsupported physical format to invalidate a different supported
+physical format.
 
 Do not force a shelf-utilization finding when the current shelf use is already
 reasonable.
@@ -970,6 +981,9 @@ support an opportunity for the selected target.
 When nearby products, trays, racks, displays, shelf arrangements, pricing, or
 other merchandising provide useful evidence, briefly reference that visible
 context in the Why or recommendation.
+When nearby merchandising materially helped establish the opportunity, preserve
+that reference in the Why field so the client can understand what visible
+environmental evidence helped drive the recommendation.
 
 Useful client-facing patterns may include:
 - "Nearby products use..."
@@ -1158,7 +1172,11 @@ Before writing findings, internally follow this order:
    how the product uses the visible shelf before choosing a solution. Consider
    shelf height, package form, stackability, visible width and depth, containment,
    capacity, access, and physically supported tray, PDQ, riser, divider, channel,
-   stacker, or compact-rack opportunities.
+   stacker, or compact-rack opportunities. If the physical candidate decision
+   passes, preserve that physical candidate before evaluating graphics,
+   navigation, or education opportunities. Do not drop a supported physical
+   candidate merely because another opportunity is easier to explain. Do not
+   require a physical candidate when the decision gate does not pass.
 
 4. Decide whether the condition is only store maintenance or reveals a real
    merchandising, branding, signage, fixture, display, or shopper need.
@@ -1401,6 +1419,12 @@ itself, including standard-shelf utilization, stacking or tiering, supported
 racks, endcaps, side placement, floor placement, or pallet-scale execution.
 Do not count ordinary store maintenance as opportunity coverage.
 
+A strong, distinct physical shelf opportunity should not be omitted merely
+because a simpler graphics, navigation, or education opportunity is also valid.
+Physical and communication findings may coexist when they solve different
+visible needs. Do not force a physical finding when the physical decision gate
+does not pass.
+
 A single image may support several different opportunities, such as:
 - product organization
 - shopper navigation or education
@@ -1536,6 +1560,12 @@ Before returning the JSON, internally review every recommendation.
 
 For each recommendation, ask:
 
+- If the standard-shelf physical candidate decision passed, did I preserve that
+  physical opportunity as a candidate rather than silently replacing it with a
+  graphics, navigation, or education idea?
+- If surrounding merchandising materially supported the recommendation, did I
+  briefly reference that visible context without turning the surroundings into
+  a separate audit target?
 - Can a client immediately understand the idea?
 - If this represents work KKG could produce, did I show what that work could
   actually be?
