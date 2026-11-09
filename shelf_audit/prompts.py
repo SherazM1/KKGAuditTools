@@ -13,7 +13,7 @@ from .audit_modes import get_mode_config, get_depth_config
 from .models import AuditMode, AuditDepth, TargetRegion
 
 
-PROMPT_VERSION = "v18"
+PROMPT_VERSION = "v19"
 
 
 def _compact_criteria(
@@ -629,6 +629,50 @@ Recommend replacement only when the visible fixture is generic, under-branded,
 poorly suited, price-dominated, or otherwise weak enough that replacement is a
 meaningful and physically supported opportunity.
 
+PLACEMENT-LED OPPORTUNITY PRIORITY:
+
+Placement changes which opportunity families deserve priority consideration,
+but placement alone does not create an opportunity and never lowers the evidence
+standard.
+
+Use the visible placement to raise the most relevant opportunity families:
+
+- ORDINARY INLINE SHELF: prioritize physical shelf use, containment,
+  organization, visibility, tiering, trays, compact PDQs, risers, dividers,
+  channels, and compact racks. Then consider navigation, education, and graphics
+  when they address a separate visible need.
+- PEGBOARD OR HANGING FIXTURE: prioritize hanging-system organization, rack or
+  fixture improvement, headers, navigation, hook-related fixture graphics,
+  branded hanging solutions, and appropriately scaled racks.
+- EXISTING GENERIC RACK: prioritize improving, branding, structurally modifying,
+  or replacing the rack before defaulting to small shelf-level graphics. A rack
+  replacement must still be visibly justified.
+- SIDE-OF-FIXTURE: prioritize sidekicks, side-oriented racks, side-panel
+  communication, and other solutions suited to visible side placement.
+- AISLE END OR END-OF-RUN: elevate endcap or sidecap opportunities when the
+  visible placement supports those formats.
+- FLOOR PLACEMENT: elevate dedicated floorstands or freestanding displays when
+  usable floor placement is visibly supported.
+- PALLET-SCALE: prioritize pallet graphics, pallet-display improvement, and
+  appropriately scaled quarter-, half-, or full-pallet solutions when visibly
+  supported.
+- EXISTING BRANDED DISPLAY: first evaluate whether the display should be
+  enhanced, modified, refreshed, rebranded, or replaced before suggesting
+  unrelated smaller additions.
+
+When multiple opportunities are similarly grounded, prefer the opportunity that
+best matches the natural scale and merchandising role of the visible placement.
+
+Do not prefer a larger solution merely because the placement allows it.
+
+Evidence strength, physical fit, shopper value, and merchandising relevance
+still control the recommendation.
+
+Do not suppress a strong smaller solution when it better solves the visible need.
+
+Do not force an opportunity family merely because it is listed as a priority for
+that placement.
+
 PHYSICAL SOLUTION SELECTION:
 
 Choose merchandising formats based on the physical retail environment that is
@@ -1168,6 +1212,11 @@ Before writing findings, internally follow this order:
 
 2. Read the surrounding retail context and identify the visible placement type.
 
+Use the identified placement to raise the opportunity families that naturally
+fit that retail context before generating and comparing candidates. Placement
+priority guides candidate consideration, but visible evidence still determines
+whether each opportunity is valid.
+
 3. If the selected target is on an ordinary retail shelf, deliberately inspect
    how the product uses the visible shelf before choosing a solution. Consider
    shelf height, package form, stackability, visible width and depth, containment,
@@ -1537,14 +1586,16 @@ Prioritize candidate opportunities that are:
 - likely to materially improve brand presence, shopper communication, product
   presentation, fixture use, or merchandising effectiveness
 - meaningfully different from one another
+- match the natural scale and merchandising role of the visible placement
 
-When two opportunities are similarly grounded, prefer the one with greater
-commercial and merchandising leverage.
+When two opportunities are similarly grounded, prefer the one that:
+- better matches the natural scale and merchandising role of the visible
+  placement
+- and provides greater commercial and merchandising leverage.
 
-Commercial leverage must NEVER override evidence.
+Placement fit and commercial leverage must NEVER override evidence.
 
-Do not recommend a larger or more expensive display merely because it could
-represent a larger project.
+Do not automatically prefer a larger or more expensive solution.
 
 A smaller tray, rack, signage element, product riser, graphic treatment, or
 other compact solution should outrank a larger display when it is better
@@ -1563,6 +1614,9 @@ For each recommendation, ask:
 - If the standard-shelf physical candidate decision passed, did I preserve that
   physical opportunity as a candidate rather than silently replacing it with a
   graphics, navigation, or education idea?
+- Does this recommendation match the natural scale and merchandising role of the
+  visible placement, or did I choose a solution that is too small, too large, or
+  unrelated to the placement?
 - If surrounding merchandising materially supported the recommendation, did I
   briefly reference that visible context without turning the surroundings into
   a separate audit target?

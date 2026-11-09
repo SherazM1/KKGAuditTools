@@ -55,8 +55,8 @@ class ShelfAuditPromptTests(unittest.TestCase):
     def section(self, start, end):
         return self.prompt().split(start, 1)[1].split(end, 1)[0]
 
-    def test_v18_three_part_gate_preserves_candidate_before_communication(self):
-        self.assertEqual(PROMPT_VERSION, "v18")
+    def test_v19_three_part_gate_preserves_candidate_before_communication(self):
+        self.assertEqual(PROMPT_VERSION, "v19")
         prompt = self.prompt()
         self.assertLess(prompt.index("STANDARD SHELF PHYSICAL SCAN:"),
                         prompt.index("ASSORTMENT AND SHOPPER NAVIGATION:"))
@@ -78,6 +78,109 @@ class ShelfAuditPromptTests(unittest.TestCase):
                 self.assertIn(instruction, scan)
         self.assertLess(scan.index("1. VISIBLE CONDITION"), scan.index("2. PLAUSIBLE KKG RESPONSE"))
         self.assertLess(scan.index("2. PLAUSIBLE KKG RESPONSE"), scan.index("3. MEANINGFUL BENEFIT"))
+
+    def test_placement_priority_section_and_families(self):
+        prompt = self.prompt()
+        self.assertLess(
+            prompt.index("RETAIL PLACEMENT AND SCENE CONTEXT:"),
+            prompt.index("PLACEMENT-LED OPPORTUNITY PRIORITY:"),
+        )
+        self.assertLess(
+            prompt.index("PLACEMENT-LED OPPORTUNITY PRIORITY:"),
+            prompt.index("PHYSICAL SOLUTION SELECTION:"),
+        )
+        priority = self.section(
+            "PLACEMENT-LED OPPORTUNITY PRIORITY:",
+            "PHYSICAL SOLUTION SELECTION:",
+        )
+        for instruction in (
+            "ORDINARY INLINE SHELF: prioritize physical shelf use, containment, organization, visibility, tiering, trays, compact PDQs, risers, dividers, channels, and compact racks",
+            "Then consider navigation, education, and graphics when they address a separate visible need",
+            "PEGBOARD OR HANGING FIXTURE: prioritize hanging-system organization, rack or fixture improvement, headers, navigation, hook-related fixture graphics, branded hanging solutions, and appropriately scaled racks",
+            "EXISTING GENERIC RACK: prioritize improving, branding, structurally modifying, or replacing the rack before defaulting to small shelf-level graphics",
+            "A rack replacement must still be visibly justified",
+            "SIDE-OF-FIXTURE: prioritize sidekicks, side-oriented racks, side-panel communication",
+            "AISLE END OR END-OF-RUN: elevate endcap or sidecap opportunities",
+            "FLOOR PLACEMENT: elevate dedicated floorstands or freestanding displays",
+            "PALLET-SCALE: prioritize pallet graphics, pallet-display improvement",
+            "quarter-, half-, or full-pallet solutions",
+            "EXISTING BRANDED DISPLAY: first evaluate whether the display should be enhanced, modified, refreshed, rebranded, or replaced before suggesting unrelated smaller additions",
+        ):
+            with self.subTest(instruction=instruction):
+                self.assertIn(instruction, priority)
+        self.assertLess(
+            priority.index("ORDINARY INLINE SHELF:"),
+            priority.index("Then consider navigation, education, and graphics"),
+        )
+
+    def test_placement_priority_is_conditional_and_evidence_led(self):
+        priority = self.section(
+            "PLACEMENT-LED OPPORTUNITY PRIORITY:",
+            "PHYSICAL SOLUTION SELECTION:",
+        )
+        for instruction in (
+            "placement alone does not create an opportunity",
+            "never lowers the evidence standard",
+            "Do not prefer a larger solution merely because the placement allows it",
+            "Evidence strength, physical fit, shopper value, and merchandising relevance still control the recommendation",
+            "Do not suppress a strong smaller solution when it better solves the visible need",
+            "Do not force an opportunity family merely because it is listed as a priority for that placement",
+        ):
+            with self.subTest(instruction=instruction):
+                self.assertIn(instruction, priority)
+
+    def test_selection_ladder_uses_placement_before_candidate_comparison(self):
+        ladder = self.section("OPPORTUNITY SELECTION LADDER:", "VOICE AND PERSPECTIVE:")
+        self.assertLess(
+            ladder.index("identify the visible placement type"),
+            ladder.index("Use the identified placement to raise the opportunity families"),
+        )
+        self.assertLess(
+            ladder.index("Use the identified placement to raise the opportunity families"),
+            ladder.index("If the selected target is on an ordinary retail shelf"),
+        )
+        self.assertIn(
+            "Placement priority guides candidate consideration, but visible evidence still determines whether each opportunity is valid",
+            ladder,
+        )
+        self.assertIn(
+            "If the physical candidate decision passes, preserve that physical candidate before evaluating graphics, navigation, or education opportunities",
+            ladder,
+        )
+
+    def test_candidate_priority_includes_placement_fit_without_overriding_evidence(self):
+        prioritization = self.section(
+            "Prioritize candidate opportunities that are:",
+            "Be conservative when the image is unclear.",
+        )
+        for instruction in (
+            "match the natural scale and merchandising role of the visible placement",
+            "When two opportunities are similarly grounded, prefer the one that:",
+            "better matches the natural scale and merchandising role of the visible placement",
+            "provides greater commercial and merchandising leverage",
+            "Placement fit and commercial leverage must NEVER override evidence",
+            "Do not automatically prefer a larger or more expensive solution",
+            "A smaller tray, rack, signage element, product riser, graphic treatment, or other compact solution should outrank a larger display when it is better supported by the scene",
+        ):
+            with self.subTest(instruction=instruction):
+                self.assertIn(instruction, prioritization)
+
+    def test_placement_scale_is_in_final_language_check(self):
+        final = self.section("FINAL LANGUAGE CHECK:", "Do not output this internal check.")
+        self.assertIn(
+            "Does this recommendation match the natural scale and merchandising role of the visible placement, or did I choose a solution that is too small, too large, or unrelated to the placement?",
+            final,
+        )
+
+    def test_placement_priority_does_not_add_scoring_or_output_fields(self):
+        prompt = self.prompt()
+        self.assertNotIn("placement score", prompt.lower())
+        self.assertNotIn("placement_score", prompt)
+        config = get_depth_config(AuditDepth.DEEP)
+        self.assertEqual(
+            (config.max_candidates, config.min_confidence, config.max_opportunities),
+            (14, .50, 8),
+        )
 
     def test_selection_ladder_preserves_passed_physical_candidate(self):
         ladder = self.section("OPPORTUNITY SELECTION LADDER:", "VOICE AND PERSPECTIVE:")
