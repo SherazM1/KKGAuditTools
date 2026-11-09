@@ -13,7 +13,7 @@ from .audit_modes import get_mode_config, get_depth_config
 from .models import AuditMode, AuditDepth, TargetRegion
 
 
-PROMPT_VERSION = "v16"
+PROMPT_VERSION = "v17"
 
 
 def _compact_criteria(
@@ -860,6 +860,160 @@ Possible solutions may include:
 Do not assume surrounding campaign communication belongs to the target unless
 the visible scene supports that relationship.
 
+STANDARD SHELF PHYSICAL SCAN:
+
+When this scan identifies a strong, visibly supported physical merchandising
+opportunity, generate that opportunity as a candidate before moving on to
+graphics, navigation, or education opportunities.
+
+Do not merely recognize a valid physical shelf opportunity internally and then
+replace it with an easier communication recommendation.
+
+A physical candidate and a graphics, navigation, or education candidate may
+both be returned when they address meaningfully different visible needs.
+
+Do not generate a physical candidate when:
+- the current shelf use is already reasonable
+- the physical improvement is speculative
+- package form or stability does not support it
+- clearance or shopper access is not visibly supported
+- the solution depends on unseen space or assumed inventory
+- the only issue is ordinary maintenance
+
+When the selected target is merchandised on an ordinary retail shelf, perform a
+deliberate physical-use scan before settling on graphics, navigation, or
+communication opportunities.
+
+Inspect only what is visibly supported:
+
+1. How the product uses the available shelf height.
+2. Whether the visible package shape, stability, and clearance support stacking,
+   tiering, or physical elevation.
+3. How the product uses the visible shelf width and footprint.
+4. Whether visible front-to-back shelf space suggests useful depth, containment,
+   or a better presentation method.
+5. Whether loose product, open gaps, mixed product heights, unstable presentation,
+   or underused shelf space support a tray, compact PDQ, product riser, divider,
+   shelf channel, stacker, or compact rack.
+6. Whether the current shelf setup limits useful capacity, product visibility,
+   shopper access, organization, or brand presence.
+7. Whether nearby merchandising provides a relevant physical reference that helps
+   explain an opportunity for the selected target.
+
+Visible physical triggers that can support a physical candidate include:
+
+VERTICAL SPACE
+- short products with clearly visible unused height
+- package form and stability support tiering, stacking, or elevation
+- shopper access and product visibility remain reasonable
+
+CONTAINMENT
+- loose products
+- weakly defined rows
+- unstable product presentation
+- mixed orientations
+- small brand blocks that would benefit from a tray, PDQ, divider, or channel
+
+DEPTH / VISIBILITY
+- products sit multiple rows deep
+- rear product is obscured
+- a stepped tray or riser could improve visibility
+
+WIDTH / FOOTPRINT
+- selected product uses its visible shelf area poorly
+- a branded tray, compact PDQ, divider, or rack could define the product area
+
+MIXED PACKAGE FORM
+- significantly different package shapes share the same selected area
+- fitted inserts, dividers, holders, or another supported physical solution could
+  improve presentation
+
+NEARBY PHYSICAL REFERENCE
+- nearby merchandising visibly demonstrates a relevant containment, stacking,
+  tray, rack, or shelf-use approach
+- the selected target must independently support the same type of solution
+
+Do not convert these into mandatory criteria. They are evidence patterns that can
+trigger candidate generation when strong.
+
+Use this scan to identify unrealized physical merchandising opportunities, not
+ordinary store-maintenance actions.
+
+Do not assume unseen shelf depth, exact dimensions, future inventory, retailer
+authorization, or ownership of nearby open space.
+
+Do not recommend stacking merely because products could theoretically be stacked.
+
+Stacking, tiering, or elevation must be visibly supported by:
+- package form
+- stability
+- vertical clearance
+- shopper access
+- product visibility
+
+Do not force a shelf-utilization finding when the current shelf use is already
+reasonable.
+
+Do not recommend a tray, PDQ, riser, divider, channel, stacker, or rack merely
+because the format is available in the KKG toolkit.
+
+The physical condition must visibly support the solution.
+
+After completing this physical scan, consider graphics, navigation, messaging,
+and branding when they address a separate visible need.
+
+ENVIRONMENT-BASED REFERENCE LANGUAGE:
+
+Use the surrounding retail environment only when it materially helps explain or
+support an opportunity for the selected target.
+
+When nearby products, trays, racks, displays, shelf arrangements, pricing, or
+other merchandising provide useful evidence, briefly reference that visible
+context in the Why or recommendation.
+
+Useful client-facing patterns may include:
+- "Nearby products use..."
+- "The shelf below uses..."
+- "A nearby tray/rack/display shows..."
+- "Similar products nearby use..."
+- "Compared with the nearby contained products..."
+
+Do NOT require these exact phrases.
+
+Do NOT make environment language mandatory.
+
+Do NOT mention surroundings when:
+- the target itself provides enough evidence
+- no useful comparison exists
+- nearby merchandising is unrelated
+- the reference would add noise
+- the environment did not materially influence the recommendation
+
+The environment is supporting evidence, not a second audit target.
+
+PHYSICAL MERCHANDISING UPGRADE:
+
+When product is presented loosely on standard retail shelving or fixtures,
+consider whether a modest physical KKG deliverable could create a stronger and
+more lasting improvement than a simple maintenance correction.
+
+Possible solutions may include:
+- branded tray
+- compact PDQ
+- small rack
+- wire or metal rack
+- divider
+- channel
+- rail
+- product riser
+- shelf frame
+- graphic insert
+- reusable compact component
+
+Use these only when they solve a visible merchandising need.
+
+Do not recommend a structure simply because one could theoretically be added.
+
 ASSORTMENT AND SHOPPER NAVIGATION:
 
 When multiple SKUs, variants, sizes, flavors, colors, or related products are
@@ -892,76 +1046,6 @@ suppress a physically supported KKG fixture or display opportunity simply
 because store staff could also regroup or face the products.
 
 Do not invent SKU relationships that cannot be established from the image.
-STANDARD SHELF PHYSICAL SCAN:
-
-When the selected target is merchandised on an ordinary retail shelf, perform a
-deliberate physical-use scan before settling on graphics, navigation, or
-communication opportunities.
-
-Inspect only what is visibly supported:
-
-1. How the product uses the available shelf height.
-2. Whether the visible package shape, stability, and clearance support stacking,
-   tiering, or physical elevation.
-3. How the product uses the visible shelf width and footprint.
-4. Whether visible front-to-back shelf space suggests useful depth, containment,
-   or a better presentation method.
-5. Whether loose product, open gaps, mixed product heights, unstable presentation,
-   or underused shelf space support a tray, compact PDQ, product riser, divider,
-   shelf channel, stacker, or compact rack.
-6. Whether the current shelf setup limits useful capacity, product visibility,
-   shopper access, organization, or brand presence.
-7. Whether nearby merchandising provides a relevant physical reference that helps
-   explain an opportunity for the selected target.
-
-Use this scan to identify unrealized physical merchandising opportunities, not
-ordinary store-maintenance actions.
-
-Do not assume unseen shelf depth, exact dimensions, future inventory, retailer
-authorization, or ownership of nearby open space.
-
-Do not recommend stacking merely because products could theoretically be stacked.
-
-Stacking, tiering, or elevation must be visibly supported by:
-- package form
-- stability
-- vertical clearance
-- shopper access
-- product visibility
-
-Do not force a shelf-utilization finding when the current shelf use is already
-reasonable.
-
-Do not recommend a tray, PDQ, riser, divider, channel, stacker, or rack merely
-because the format is available in the KKG toolkit.
-
-The physical condition must visibly support the solution.
-
-After completing this physical scan, consider graphics, navigation, messaging,
-and branding when they address a separate visible need.
-
-PHYSICAL MERCHANDISING UPGRADE:
-
-When product is presented loosely on standard retail shelving or fixtures,
-consider whether a modest physical KKG deliverable could create a stronger and
-more lasting improvement than a simple maintenance correction.
-
-Possible solutions may include:
-- branded tray
-- compact PDQ
-- small rack
-- wire or metal rack
-- divider
-- channel
-- rail
-- product riser
-- shelf frame
-- graphic insert
-- reusable compact component
-
-Use these only when they solve a visible merchandising need.
-
-Do not recommend a structure simply because one could theoretically be added.
 
 {mode_instructions}
 

@@ -4,7 +4,7 @@ import unittest
 
 from shelf_audit.audit_modes import get_depth_config
 from shelf_audit.models import AuditDepth, AuditMode, TargetRegion
-from shelf_audit.prompts import build_audit_prompt
+from shelf_audit.prompts import build_audit_prompt, PROMPT_VERSION
 
 
 class ShelfAuditPromptTests(unittest.TestCase):
@@ -48,6 +48,21 @@ class ShelfAuditPromptTests(unittest.TestCase):
             "cause unsupported observations to be omitted",
             "do not judge physical label legibility",
             "independently of camera quality",
+        ):
+            with self.subTest(instruction=instruction):
+                self.assertIn(instruction, prompt)
+
+    def test_v17_physical_trigger_and_environment_reference_are_present(self):
+        self.assertEqual(PROMPT_VERSION, "v17")
+        prompt = self.prompt()
+        for instruction in (
+            "When this scan identifies a strong, visibly supported physical merchandising",
+            "generate that opportunity as a candidate before moving on to graphics, navigation, or education opportunities",
+            "Do not generate a physical candidate when:",
+            "VERTICAL SPACE",
+            "ENVIRONMENT-BASED REFERENCE LANGUAGE:",
+            "The environment is supporting evidence, not a second audit target.",
+            "Do NOT make environment language mandatory.",
         ):
             with self.subTest(instruction=instruction):
                 self.assertIn(instruction, prompt)
