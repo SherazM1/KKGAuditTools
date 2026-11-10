@@ -20,12 +20,14 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from dataclasses import dataclass
 from typing import Any
 
 import openai
 from openai import OpenAI
 
+from ..infrastructure.cost import response_cost_diagnostic
 from ..audit_modes import get_depth_config
 from ..models import (
     AuditImage,
@@ -560,6 +562,8 @@ class OpenAIAuditProvider(AuditProvider):
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
             ),
+            debug_cost=(response_cost_diagnostic(model=self.model_name, usage=usage)
+                        if os.environ.get("SHELF_AUDIT_DEBUG_TRACE") == "1" else None),
             provider_request_id=request_id,
             attempt_count=1,
         )

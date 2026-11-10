@@ -7,7 +7,7 @@ All real or mock AI providers should follow this contract.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..models import AuditRequest
 from ..opportunity import Opportunity
@@ -91,6 +91,9 @@ class ProviderUsage:
     provider_request_id: str | None = None
 
     attempt_count: int = 0
+
+    # Ephemeral debug metadata; never copied into AuditResult or usage records.
+    debug_cost: dict | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True)

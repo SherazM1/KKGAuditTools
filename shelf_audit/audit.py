@@ -221,6 +221,11 @@ def run_audit(
 
         if cached_result is not None:
             if trace is not None:
+                trace["api_usage_cost"] = dict(
+                    model=model_name, provider_called=False, application_cache_hit=True,
+                    estimated_cost_usd=0.0, estimate_complete=True,
+                    reason="No new provider request; incremental execution cost is zero.",
+                )
                 trace["note"] = "Cache hit: earlier candidate stages are unavailable; provider was not called."
                 snapshot_candidates(trace, "FINAL_SELECTED", cached_result.opportunities, scored=True)
             duration = perf_counter() - start_time
@@ -286,6 +291,15 @@ def run_audit(
             ProviderAnalysisResult
         ):
             raise TypeError("Provider returned an invalid result.")
+
+        if trace is not None:
+            cost = provider_result.usage.debug_cost
+            trace["api_usage_cost"] = {
+                **(cost or dict(model=model_name, estimated_cost_usd=None,
+                                estimate_complete=False, reason="Provider cost diagnostics unavailable")),
+                "provider_called": provider_result.usage.provider_called,
+                "application_cache_hit": False,
+            }
 
         opportunities = provider_result.opportunities
         snapshot_candidates(trace, "RAW_PROVIDER_CANDIDATES", opportunities)

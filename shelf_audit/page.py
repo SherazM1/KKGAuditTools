@@ -45,6 +45,26 @@ def _render_debug_trace(trace):
             return
         if trace.get("note"):
             st.caption(trace["note"])
+        cost = trace.get("api_usage_cost")
+        if cost:
+            st.caption("API USAGE / COST")
+            st.write(f"Model: {cost.get('model')}")
+            st.write(f"Provider call: {'yes' if cost.get('provider_called') else 'no'} | "
+                     f"Application cache hit: {'yes' if cost.get('application_cache_hit') else 'no'}")
+            amount = cost.get("estimated_cost_usd")
+            display = "unavailable" if amount is None else f"${amount:.4f}"
+            if amount is not None and not cost.get("estimate_complete"):
+                display = f"partial estimate ({display})"
+            st.write(f"Estimated API cost for this audit execution: {display}")
+            if cost.get("reason"):
+                st.caption(cost["reason"])
+            tokens = {name: cost[name] for name in (
+                "input_tokens", "ordinary_input_tokens", "cached_input_tokens",
+                "cache_write_tokens", "cache_write_30m_tokens", "cache_write_12h_tokens",
+                "output_tokens",
+            ) if name in cost}
+            if tokens:
+                st.json(tokens)
         stages = trace.get("stages", {})
         labels = ("Raw candidates", "After confidence", "After dedupe", "After selection", "Final")
         names = ("RAW_PROVIDER_CANDIDATES", "AFTER_CONFIDENCE_FILTER",

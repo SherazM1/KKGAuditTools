@@ -55,8 +55,8 @@ class ShelfAuditPromptTests(unittest.TestCase):
     def section(self, start, end):
         return self.prompt().split(start, 1)[1].split(end, 1)[0]
 
-    def test_v19_three_part_gate_preserves_candidate_before_communication(self):
-        self.assertEqual(PROMPT_VERSION, "v19")
+    def test_v20_three_part_gate_preserves_candidate_before_communication(self):
+        self.assertEqual(PROMPT_VERSION, "v20")
         prompt = self.prompt()
         self.assertLess(prompt.index("STANDARD SHELF PHYSICAL SCAN:"),
                         prompt.index("ASSORTMENT AND SHOPPER NAVIGATION:"))
@@ -300,3 +300,47 @@ class ShelfAuditPromptTests(unittest.TestCase):
         config = get_depth_config(AuditDepth.DEEP)
         self.assertEqual((config.max_candidates, config.min_confidence,
                           config.max_opportunities), (14, .50, 8))
+
+
+    def test_pallet_execution_is_independent_of_package_branding(self):
+        pallet = self.section("PALLET EXECUTION VS PRODUCT PACKAGING:", "PHYSICAL SOLUTION SELECTION:")
+        for instruction in (
+            "Evaluate the physical pallet execution separately from branding printed on the product packages",
+            "Strong package branding does NOT by itself mean the pallet execution is a purpose-built branded display",
+            "Branded cartons, cases, tubs, or packages stacked on a generic pallet, plain divider sheets, slip sheets, simple corrugate layers, or basic stacking support may still justify a branded pallet-display opportunity",
+            "Do not call it weak merely because it lacks decorative graphics",
+            "Judge whether the structure meaningfully presents, organizes, brands, navigates, or supports the product",
+        ):
+            with self.subTest(instruction=instruction):
+                self.assertIn(instruction, pallet)
+
+    def test_pallet_candidate_gate_and_preservation(self):
+        pallet = self.section("PALLET EXECUTION VS PRODUCT PACKAGING:", "PHYSICAL SOLUTION SELECTION:")
+        for instruction in (
+            "evaluate the pallet execution itself before settling only on smaller signage, price communication, or navigation",
+            "Generate and preserve a pallet-display candidate when ALL THREE are supported",
+            "PALLET-SCALE PLACEMENT: Substantial pallet-scale or equivalent large-format merchandising is clearly visible",
+            "GENERIC / BASIC EXECUTION: Product is primarily stacked on a generic pallet, divider sheets, slip sheets, simple corrugate support, or another basic structure rather than a purposeful branded display",
+            "MEANINGFUL BENEFIT: A purpose-built branded pallet display could materially improve presentation, brand ownership, organization, navigation, stopping power, or shopper-facing execution",
+            "When all three are supported, preserve that candidate before evaluating smaller graphics/navigation opportunities separately",
+            "Do not force a pallet-display candidate when placement is uncertain, the current branded display structure is already strong, replacement is speculative, or there is no meaningful visible benefit",
+            "Do not depend on assumed future inventory, retailer approval, unseen floor space, budget, or dimensions",
+            "A pallet alone does not justify replacement",
+            "may both be candidates when they represent distinct, supported scopes; do not force both",
+        ):
+            with self.subTest(instruction=instruction):
+                self.assertIn(instruction, pallet)
+        final = self.section("FINAL LANGUAGE CHECK:", "Do not output this internal check.")
+        self.assertIn("For a pallet-scale target, did I evaluate the physical pallet execution separately from the branding printed on the product packages?", final)
+
+    def test_pallet_graphics_and_v19_placement_priority_remain(self):
+        prompt = self.prompt()
+        for instruction in (
+            "PALLET-SCALE: prioritize pallet graphics, pallet-display improvement",
+            "Keep pallet-base graphics, pallet wraps, divider/tier graphics, variant navigation, price-sign integration, and quarter-, half-, or full-pallet formats available when supported",
+            "Smaller pallet improvements remain valid when they are the better fit",
+            "Placement priority guides candidate consideration, but visible evidence still determines whether each opportunity is valid",
+            "Do not suppress a strong smaller solution when it better solves the visible need",
+        ):
+            with self.subTest(instruction=instruction):
+                self.assertIn(instruction, prompt)

@@ -13,7 +13,7 @@ from .audit_modes import get_mode_config, get_depth_config
 from .models import AuditMode, AuditDepth, TargetRegion
 
 
-PROMPT_VERSION = "v19"
+PROMPT_VERSION = "v20"
 
 
 def _compact_criteria(
@@ -672,6 +672,46 @@ Do not suppress a strong smaller solution when it better solves the visible need
 
 Do not force an opportunity family merely because it is listed as a priority for
 that placement.
+
+PALLET EXECUTION VS PRODUCT PACKAGING:
+
+Evaluate the physical pallet execution separately from branding printed on the
+product packages. Strong package branding does NOT by itself mean the pallet
+execution is a purpose-built branded display. Branded cartons, cases, tubs, or
+packages stacked on a generic pallet, plain divider sheets, slip sheets, simple
+corrugate layers, or basic stacking support may still justify a branded
+pallet-display opportunity at the visible scale.
+
+Ask not only "Is the product itself branded?" but also "Is the physical pallet
+execution functioning as a purposeful branded retail display?" Do not call it
+weak merely because it lacks decorative graphics. Judge whether the structure
+meaningfully presents, organizes, brands, navigates, or supports the product.
+
+When pallet-scale placement is clearly established, evaluate the pallet execution
+itself before settling only on smaller signage, price communication, or navigation.
+Generate and preserve a pallet-display candidate when ALL THREE are supported:
+1. PALLET-SCALE PLACEMENT: Substantial pallet-scale or equivalent large-format
+   merchandising is clearly visible.
+2. GENERIC / BASIC EXECUTION: Product is primarily stacked on a generic pallet,
+   divider sheets, slip sheets, simple corrugate support, or another basic
+   structure rather than a purposeful branded display.
+3. MEANINGFUL BENEFIT: A purpose-built branded pallet display could materially
+   improve presentation, brand ownership, organization, navigation, stopping
+   power, or shopper-facing execution.
+
+When all three are supported, preserve that candidate before evaluating smaller
+graphics/navigation opportunities separately. Do not force a pallet-display
+candidate when placement is uncertain, the current branded display structure is
+already strong, replacement is speculative, or there is no meaningful visible
+benefit. Do not depend on assumed future inventory, retailer approval, unseen
+floor space, budget, or dimensions. A pallet alone does not justify replacement.
+
+Keep pallet-base graphics, pallet wraps, divider/tier graphics, variant navigation,
+price-sign integration, and quarter-, half-, or full-pallet formats available when
+supported. Smaller pallet improvements remain valid when they are the better fit.
+Improving the current pallet execution and a purpose-built branded pallet display
+may both be candidates when they represent distinct, supported scopes; do not
+force both.
 
 PHYSICAL SOLUTION SELECTION:
 
@@ -1620,6 +1660,8 @@ For each recommendation, ask:
 - If surrounding merchandising materially supported the recommendation, did I
   briefly reference that visible context without turning the surroundings into
   a separate audit target?
+- For a pallet-scale target, did I evaluate the physical pallet execution
+  separately from the branding printed on the product packages?
 - Can a client immediately understand the idea?
 - If this represents work KKG could produce, did I show what that work could
   actually be?
