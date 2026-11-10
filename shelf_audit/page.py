@@ -56,11 +56,20 @@ def _render_debug_trace(trace):
             if amount is not None and not cost.get("estimate_complete"):
                 display = f"partial estimate ({display})"
             st.write(f"Estimated API cost for this audit execution: {display}")
+            if cost.get("cache_write_tokens"):
+                ttl_source = cost.get("cache_write_ttl_source", "unknown")
+                ttl_label = {
+                    "default_30m": "default 30m",
+                    "provider_breakdown": "provider breakdown",
+                    "request_configuration": f"request configuration ({cost.get('request_cache_ttl')})",
+                }.get(ttl_source, "unknown")
+                st.caption(f"Cache-write TTL: {ttl_label}")
             if cost.get("reason"):
                 st.caption(cost["reason"])
             tokens = {name: cost[name] for name in (
                 "input_tokens", "ordinary_input_tokens", "cached_input_tokens",
                 "cache_write_tokens", "cache_write_30m_tokens", "cache_write_12h_tokens",
+                "effective_cache_write_30m_tokens", "effective_cache_write_12h_tokens",
                 "output_tokens",
             ) if name in cost}
             if tokens:
