@@ -1,7 +1,7 @@
 streamlit>=1.53
 pillow==11.3.0
 streamlit-drawable-canvas==0.13.0
-openai
+openai>=3.24.0  # Shelf Audit Responses prompt_cache_breakpoint support.
 reportlab>=4.4,<5  # Deterministic Shelf Audit PDF reports.
 python-docx>=1.2,<2  # Editable Shelf Audit reports; no Office installation needed.
 fonttools>=4.53,<5  # Inspect Gotham font metadata before embedding in DOCX reports.

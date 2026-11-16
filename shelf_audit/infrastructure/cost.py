@@ -22,6 +22,15 @@ def _field(value, name, default=None):
     return value.get(name, default) if isinstance(value, dict) else getattr(value, name, default)
 
 
+def prompt_cache_reuse_ratio(input_tokens, cached_input_tokens):
+    """Actual provider usage only; unavailable/invalid usage has no ratio."""
+    if (isinstance(input_tokens, bool) or not isinstance(input_tokens, int) or input_tokens <= 0
+            or isinstance(cached_input_tokens, bool) or not isinstance(cached_input_tokens, int)
+            or not 0 <= cached_input_tokens <= input_tokens):
+        return None
+    return cached_input_tokens / input_tokens
+
+
 def estimate_openai_request_cost(*, model, input_tokens=None, output_tokens=None,
                                 cached_input_tokens=0, cache_write_tokens=0,
                                 cache_write_30m_tokens=0, cache_write_12h_tokens=0,
@@ -102,6 +111,8 @@ def response_cost_diagnostic(*, model, usage, request_cache_ttl=None):
         )
         if usage is None:
             result.update(estimated_cost_usd=None, estimate_complete=False, reason="Provider usage unavailable")
+        result["prompt_cache_reuse_ratio"] = prompt_cache_reuse_ratio(
+            _field(usage, "input_tokens"), _field(details, "cached_tokens"))
         return result
     except Exception:
         return dict(model=model, estimated_cost_usd=None, estimate_complete=False,

@@ -10,6 +10,7 @@ from __future__ import annotations
 from .opportunity import Opportunity
 from dataclasses import dataclass
 from enum import Enum
+import math
 
 
 class AuditMode(str, Enum):
@@ -44,6 +45,28 @@ class TargetRegion:
     y: float
     width: float
     height: float
+
+
+FULL_IMAGE_TARGET_TOLERANCE = 1e-6
+
+
+def is_full_image_target(target_region: TargetRegion | None) -> bool:
+    """Recognize valid full-frame coordinates within absolute tolerance 1e-6.
+
+    Invalid/missing regions never qualify; existing validation owns their errors.
+    """
+    if not isinstance(target_region, TargetRegion):
+        return False
+    values = (target_region.x, target_region.y, target_region.width, target_region.height)
+    if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v)
+           for v in values):
+        return False
+    x, y, width, height = values
+    if not (0 <= x <= 1 and 0 <= y <= 1 and 0 < width <= 1 and 0 < height <= 1
+            and x + width <= 1 and y + height <= 1):
+        return False
+    return all(abs(v - expected) <= FULL_IMAGE_TARGET_TOLERANCE
+               for v, expected in zip(values, (0, 0, 1, 1)))
 
 
 @dataclass

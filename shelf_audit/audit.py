@@ -40,6 +40,8 @@ from .models import (
 from .providers.base import ProviderAnalysisResult, ProviderConfigurationError
 from .prioritization import prioritize_opportunities, snapshot_candidates
 from .criteria import validate_criteria
+from .models import is_full_image_target
+from .prompts import audit_prompt_sizes
 
 
 def debug_trace_enabled() -> bool:
@@ -190,6 +192,19 @@ def run_audit(
             target_crop=target_crop
         )
 
+        if trace is not None:
+            crop_sent = mode is AuditMode.EXPANDED and not is_full_image_target(target_region)
+            detail_for = getattr(provider, "image_detail_for", lambda role: None)
+            trace["request_cost"] = {
+                **audit_prompt_sizes(request),
+                "model": model_name,
+                "reasoning_effort": getattr(getattr(provider, "config", None), "reasoning_effort", None),
+                "images_sent": 1 + int(crop_sent),
+                "full_scene_detail": detail_for("full_scene"),
+                "target_crop_sent": crop_sent,
+                "target_crop_detail": detail_for("target_crop") if crop_sent else None,
+            }
+
         # -------------------------------------------------
         # Request fingerprint
         # -------------------------------------------------
@@ -221,6 +236,7 @@ def run_audit(
 
         if cached_result is not None:
             if trace is not None:
+                trace["request_cost"].update(images_sent=0, target_crop_sent=False, target_crop_detail=None)
                 trace["api_usage_cost"] = dict(
                     model=model_name, provider_called=False, application_cache_hit=True,
                     estimated_cost_usd=0.0, estimate_complete=True,

@@ -33,9 +33,10 @@ from ..models import (
     AuditImage,
     AuditMode,
     AuditRequest,
+    is_full_image_target,
 )
 from ..opportunity import Opportunity
-from ..prompts import build_audit_prompt
+from ..prompts import build_audit_prompt, build_stable_audit_instructions, build_dynamic_audit_context
 from .base import (
     AuditProvider,
     ProviderAnalysisResult,
@@ -81,8 +82,14 @@ class OpenAIProviderConfig:
 
     reasoning_effort: str = "low"
     image_detail: str = "high"
+    full_scene_image_detail: str = "high"
+    target_crop_image_detail: str = "high"
 
     def __post_init__(self) -> None:
+        for name in ("full_scene_image_detail", "target_crop_image_detail"):
+            if (not isinstance(getattr(self, name), str)
+                    or getattr(self, name) not in {"low", "high", "original", "auto"}):
+                raise ValueError(f"{name} must be low, high, original, or auto.")
         if (
             not isinstance(self.reasoning_effort, str)
             or self.reasoning_effort not in {"low", "medium", "high", "xhigh", "max"}
@@ -296,9 +303,8 @@ class OpenAIAuditProvider(AuditProvider):
 
     name = "openai"
 
-    # Incremented because provider behavior is changing
-    # from scaffold-only to Responses API execution.
-    config_version = "3"
+    # Request structure changed; detail variants must have separate cache identities.
+    config_version = "4"
 
     def __init__(
         self,
@@ -310,6 +316,9 @@ class OpenAIAuditProvider(AuditProvider):
 
         self.config = config
         self.model_name = config.model_name
+        self.config_version = (
+            f"4:scene={self.image_detail_for('full_scene')}:crop={self.image_detail_for('target_crop')}"
+        )
 
         # Tests can inject a fake client without any API key.
         if client is not None:
@@ -372,7 +381,7 @@ class OpenAIAuditProvider(AuditProvider):
 
         Expanded:
         - prepared full scene
-        - prepared target crop
+        - prepared target crop for a subsection (full-frame duplicates omitted)
         """
 
         image_inputs = [
@@ -389,6 +398,9 @@ class OpenAIAuditProvider(AuditProvider):
                 raise ProviderConfigurationError(
                     "Expanded mode requires a prepared target crop."
                 )
+
+            if is_full_image_target(request.target_region):
+                return image_inputs
 
             image_inputs.append(
                 {
@@ -413,11 +425,15 @@ class OpenAIAuditProvider(AuditProvider):
         content: list[dict] = [
             {
                 "type": "input_text",
-                "text": self._build_prompt(
-                    request
-                ),
+                "text": build_stable_audit_instructions(
+                    list(request.criteria), request.mode, request.depth),
+                "prompt_cache_breakpoint": {"mode": "explicit"},
             }
         ]
+
+        dynamic = build_dynamic_audit_context(request.mode, request.target_region)
+        if dynamic:
+            content.append({"type": "input_text", "text": dynamic})
 
         for image_input in self._build_image_inputs(
             request
@@ -441,7 +457,7 @@ class OpenAIAuditProvider(AuditProvider):
                     "image_url": image_input[
                         "data_url"
                     ],
-                    "detail": self.config.image_detail,
+                    "detail": self.image_detail_for(role),
                 }
             )
 
@@ -451,6 +467,13 @@ class OpenAIAuditProvider(AuditProvider):
                 "content": content,
             }
         ]
+
+    def image_detail_for(self, role: str) -> str:
+        # Retain the legacy shared override for existing developer callers.
+        if self.config.image_detail != "high":
+            return self.config.image_detail
+        return (self.config.full_scene_image_detail if role == "full_scene"
+                else self.config.target_crop_image_detail)
 
     def _candidate_limit(
         self,

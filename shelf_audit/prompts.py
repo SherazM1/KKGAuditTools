@@ -16,6 +16,37 @@ from .models import AuditMode, AuditDepth, TargetRegion
 PROMPT_VERSION = "v20"
 
 
+def build_dynamic_audit_context(mode, target_region=None) -> str:
+    """Only the per-audit coordinates; scope rules remain in the stable prefix."""
+    if mode is not AuditMode.EXPANDED:
+        return ""
+    coordinates = "No target region supplied."
+    if target_region is not None:
+        coordinates = (
+            f"x={target_region.x:.4f}, y={target_region.y:.4f}, "
+            f"width={target_region.width:.4f}, height={target_region.height:.4f}"
+        )
+    return "Selected target region:\n" + coordinates
+
+
+def build_audit_prompt(criteria, mode, depth, target_region=None) -> str:
+    """Keep the v20 instructions intact, placing coordinates after reusable text."""
+    stable = build_stable_audit_instructions(criteria, mode, depth)
+    dynamic = build_dynamic_audit_context(mode, target_region)
+    return stable + ("\n\n" + dynamic if dynamic else "")
+
+
+def audit_prompt_sizes(request) -> dict:
+    """Local character measurements, never token estimates."""
+    return dict(
+        prompt_version=PROMPT_VERSION,
+        stable_prompt_chars=len(build_stable_audit_instructions(
+            list(request.criteria), request.mode, request.depth)),
+        dynamic_text_chars=len(build_dynamic_audit_context(request.mode, request.target_region)),
+        criteria_chars=len(_compact_criteria(list(request.criteria))),
+    )
+
+
 def _compact_criteria(
     criteria: list[dict],
 ) -> str:
@@ -64,6 +95,8 @@ def _compact_criteria(
 def _build_mode_instructions(
     mode: AuditMode,
     target_region: TargetRegion | None,
+    *,
+    include_target_context: bool = True,
 ) -> str:
     """
     Build mode-specific reasoning instructions.
@@ -97,6 +130,10 @@ Do not invent or search for a separate target product.
                 f"height={target_region.height:.4f}"
             )
 
+        target_context = (
+            "Selected target region:\n" + target_region_text
+            if include_target_context else ""
+        )
         return f"""
 AUDIT MODE: EXPANDED
 
@@ -104,8 +141,7 @@ The user has selected exactly ONE target within a wider retail scene.
 
 The selected target is the ONLY product or product area being audited.
 
-Selected target region:
-{target_region_text}
+{target_context}
 
 Use the wider scene to understand:
 - neighboring products
@@ -214,11 +250,10 @@ lower the evidence standard simply to produce more findings.
     )
 
 
-def build_audit_prompt(
+def build_stable_audit_instructions(
     criteria: list[dict],
     mode: AuditMode,
     depth: AuditDepth,
-    target_region: TargetRegion | None = None,
 ) -> str:
     """
     Build the opportunity-first audit prompt.
@@ -233,7 +268,8 @@ def build_audit_prompt(
 
     mode_instructions = _build_mode_instructions(
         mode,
-        target_region,
+        None,
+        include_target_context=False,
     )
 
     depth_instructions = _build_depth_instructions(

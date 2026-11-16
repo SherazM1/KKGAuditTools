@@ -47,7 +47,23 @@ def _render_debug_trace(trace):
             st.caption(trace["note"])
         cost = trace.get("api_usage_cost")
         if cost:
-            st.caption("API USAGE / COST")
+            st.caption("REQUEST / COST")
+            request_cost = trace.get("request_cost", {})
+            if request_cost:
+                st.write(f"Prompt: {request_cost.get('prompt_version')} | "
+                         f"Reasoning: {request_cost.get('reasoning_effort')}")
+                st.write(f"Stable prompt chars: {request_cost.get('stable_prompt_chars')} | "
+                         f"Dynamic text chars: {request_cost.get('dynamic_text_chars')} | "
+                         f"Criteria chars: {request_cost.get('criteria_chars')}")
+                st.write(f"Images sent: {request_cost.get('images_sent')} | "
+                         f"Full-scene detail: {request_cost.get('full_scene_detail')} | "
+                         f"Target-crop sent: {'yes' if request_cost.get('target_crop_sent') else 'no'}")
+                if request_cost.get("target_crop_sent"):
+                    st.write(f"Target-crop detail: {request_cost.get('target_crop_detail')}")
+            reuse = cost.get("prompt_cache_reuse_ratio")
+            st.write("Prompt-cache reuse: " + ("unavailable" if reuse is None else f"{reuse:.1%}"))
+            cached_input = cost.get("cached_input_tokens") if cost.get("input_tokens") is not None else None
+            st.write("Prompt cached input: " + ("unavailable" if cached_input is None else str(cached_input)))
             st.write(f"Model: {cost.get('model')}")
             st.write(f"Provider call: {'yes' if cost.get('provider_called') else 'no'} | "
                      f"Application cache hit: {'yes' if cost.get('application_cache_hit') else 'no'}")
